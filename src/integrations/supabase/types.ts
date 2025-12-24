@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          key: string
+          name: string
+          xp_reward: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          icon?: string
+          id?: string
+          key: string
+          name: string
+          xp_reward?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          key?: string
+          name?: string
+          xp_reward?: number
+        }
+        Relationships: []
+      }
+      problem_hints: {
+        Row: {
+          content: string
+          created_at: string
+          hint_order: number
+          id: string
+          problem_id: string
+          xp_cost: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          hint_order?: number
+          id?: string
+          problem_id: string
+          xp_cost?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          hint_order?: number
+          id?: string
+          problem_id?: string
+          xp_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "problem_hints_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       problems: {
         Row: {
           constraints: string | null
@@ -142,6 +210,64 @@ export type Database = {
           },
         ]
       }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_hint_views: {
+        Row: {
+          hint_id: string
+          id: string
+          user_id: string
+          viewed_at: string
+        }
+        Insert: {
+          hint_id: string
+          id?: string
+          user_id: string
+          viewed_at?: string
+        }
+        Update: {
+          hint_id?: string
+          id?: string
+          user_id?: string
+          viewed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_hint_views_hint_id_fkey"
+            columns: ["hint_id"]
+            isOneToOne: false
+            referencedRelation: "problem_hints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -159,6 +285,39 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_templates: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          language: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          language?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          language?: string
+          name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

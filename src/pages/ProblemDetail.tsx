@@ -46,7 +46,11 @@ import MobileViewToggle from "@/components/mobile/MobileViewToggle";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import KeyboardShortcutsDialog from "@/components/editor/KeyboardShortcutsDialog";
 import CodeHistoryPanel from "@/components/editor/CodeHistoryPanel";
+import HintsPanel from "@/components/editor/HintsPanel";
+import CodeTemplatesPanel from "@/components/editor/CodeTemplatesPanel";
+import AchievementsPanel from "@/components/achievements/AchievementsPanel";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAchievements } from "@/hooks/useAchievements";
 
 interface Sample {
   input: string;
@@ -117,6 +121,7 @@ const ProblemDetail = () => {
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
   const { settings } = useSettings();
+  const { checkSubmissionAchievements } = useAchievements();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
   
@@ -484,8 +489,16 @@ const ProblemDetail = () => {
       if (data.status === "Accepted") {
         toast.success("🎉 Accepted! +50 XP");
         refreshProfile();
+        // Check for achievements
+        if (user) {
+          checkSubmissionAchievements(user.id, true, new Date());
+        }
       } else {
         toast.error(data.status);
+        // Check for first submission achievement even if not accepted
+        if (user) {
+          checkSubmissionAchievements(user.id, false, new Date());
+        }
       }
 
       fetchSubmissions();
@@ -550,8 +563,10 @@ const ProblemDetail = () => {
             </Badge>
           </div>
 
-          {/* Desktop Run/Submit buttons */}
+          {/* Desktop Run/Submit buttons and features */}
           <div className="hidden md:flex items-center gap-1 sm:gap-2">
+            <AchievementsPanel />
+            {id && <HintsPanel problemId={id} />}
             <Button
               variant="outline"
               size="sm"
@@ -825,6 +840,7 @@ const ProblemDetail = () => {
                 </Button>
                 <KeyboardShortcutsDialog />
                 {id && <CodeHistoryPanel problemId={id} onLoadCode={handleLoadCode} />}
+                <CodeTemplatesPanel currentCode={code} onLoadTemplate={handleLoadCode} />
                 <Button
                   variant="ghost"
                   size="sm"
