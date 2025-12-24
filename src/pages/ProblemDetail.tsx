@@ -21,6 +21,8 @@ import {
   Copy,
   Sun,
   Moon,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +127,7 @@ const ProblemDetail = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [editorTheme, setEditorTheme] = useState<"vs-dark" | "light">("vs-dark");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Load saved code from localStorage
   useEffect(() => {
@@ -751,7 +754,11 @@ const ProblemDetail = () => {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex-1 flex flex-col min-h-[400px] lg:min-h-0"
+            className={`flex flex-col ${
+              isFullscreen 
+                ? "fixed inset-0 z-50 bg-background" 
+                : "flex-1 min-h-[400px] lg:min-h-0"
+            }`}
           >
             <div className="h-10 border-b border-border bg-secondary/50 flex items-center px-4 justify-between">
               <div className="flex items-center gap-3">
@@ -802,6 +809,19 @@ const ProblemDetail = () => {
                 >
                   <Wand2 className="h-3 w-3 mr-1" />
                   Format
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3 w-3 mr-1" />
+                  ) : (
+                    <Maximize2 className="h-3 w-3 mr-1" />
+                  )}
+                  {isFullscreen ? "Exit" : "Fullscreen"}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
