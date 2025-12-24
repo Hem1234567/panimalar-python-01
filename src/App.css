@@ -4,11 +4,16 @@
 }
 
 /* Monaco Editor - ensure hidden input elements stay hidden */
-.monaco-editor .inputarea {
+.monaco-editor textarea.inputarea {
+  opacity: 0 !important;
   background: transparent !important;
   border: none !important;
+  resize: none !important;
+  width: 1px !important;
+  height: 1px !important;
 }
 
-.monaco-editor textarea.inputarea.monaco-mouse-cursor-text {
+/* Fallback selector for some Monaco builds */
+.monaco-editor .inputarea {
   opacity: 0 !important;
 }
