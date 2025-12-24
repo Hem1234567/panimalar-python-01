@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Editor from "@monaco-editor/react";
 import {
@@ -13,104 +13,223 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-// Mock problem data
-const mockProblem = {
-  id: "1",
-  title: "Two Sum",
-  difficulty: "Easy",
-  tags: ["Array", "Hash Table"],
-  statement: `Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers such that they add up to \`target\`.
+interface Sample {
+  input: string;
+  output: string;
+  explanation?: string;
+}
 
-You may assume that each input would have **exactly one solution**, and you may not use the same element twice.
+interface Problem {
+  id: string;
+  title: string;
+  statement: string;
+  difficulty: string;
+  tags: string[];
+  input_format: string;
+  output_format: string;
+  constraints: string;
+  samples: Sample[];
+  time_limit: number;
+}
 
-You can return the answer in any order.`,
-  inputFormat: "The first line contains the array of integers separated by spaces.\nThe second line contains the target integer.",
-  outputFormat: "Print the two indices separated by a space.",
-  constraints: `- 2 ≤ nums.length ≤ 10⁴
-- -10⁹ ≤ nums[i] ≤ 10⁹
-- -10⁹ ≤ target ≤ 10⁹
-- Only one valid answer exists.`,
-  samples: [
-    {
-      input: "2 7 11 15\n9",
-      output: "0 1",
-      explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
-    },
-    {
-      input: "3 2 4\n6",
-      output: "1 2",
-      explanation: "Because nums[1] + nums[2] == 6, we return [1, 2].",
-    },
-  ],
-};
+interface Submission {
+  id: string;
+  status: string;
+  created_at: string;
+  execution_time: number;
+}
 
-const defaultCode = `def solve(nums, target):
-    # Your code here
-    seen = {}
-    for i, num in enumerate(nums):
-        complement = target - num
-        if complement in seen:
-            return [seen[complement], i]
-        seen[num] = i
-    return []
+const defaultCode = `# Write your Python solution here
 
-# Read input
-nums = list(map(int, input().split()))
-target = int(input())
+def solve():
+    # Read input
+    line = input()
+    
+    # Your solution
+    
+    # Print output
+    print(line)
 
-# Solve and print result
-result = solve(nums, target)
-print(*result)
+solve()
 `;
 
 const ProblemDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user, refreshProfile } = useAuth();
+  
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [code, setCode] = useState(defaultCode);
   const [activeTab, setActiveTab] = useState("description");
+  const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
-  const [verdict, setVerdict] = useState<"success" | "error" | null>(null);
+  const [verdict, setVerdict] = useState<"success" | "error" | "info" | null>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(true);
 
+  useEffect(() => {
+    if (id) {
+      fetchProblem();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id && user) {
+      fetchSubmissions();
+    }
+  }, [id, user]);
+
+  const fetchProblem = async () => {
+    const { data, error } = await supabase
+      .from("problems")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      toast.error("Problem not found");
+      navigate("/problems");
+      return;
+    }
+
+    // Cast the data properly
+    const samplesData = Array.isArray(data.samples) ? data.samples : [];
+    const problemData: Problem = {
+      id: data.id,
+      title: data.title,
+      statement: data.statement,
+      difficulty: data.difficulty,
+      tags: data.tags || [],
+      input_format: data.input_format || "",
+      output_format: data.output_format || "",
+      constraints: data.constraints || "",
+      samples: samplesData as Sample[],
+      time_limit: data.time_limit,
+    };
+
+    setProblem(problemData);
+    setIsLoading(false);
+  };
+
+  const fetchSubmissions = async () => {
+    if (!user || !id) return;
+
+    const { data } = await supabase
+      .from("submissions")
+      .select("id, status, created_at, execution_time")
+      .eq("user_id", user.id)
+      .eq("problem_id", id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (data) {
+      setSubmissions(data);
+    }
+  };
+
   const handleRun = async () => {
+    if (!user) {
+      toast.error("Please log in to run code");
+      navigate("/auth");
+      return;
+    }
+
     setIsRunning(true);
     setOutput(null);
     setVerdict(null);
 
-    // Simulate running code
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { data, error } = await supabase.functions.invoke("python-judge", {
+        body: {
+          problem_id: id,
+          code,
+          user_id: user.id,
+          run_only: true,
+        },
+      });
 
-    setOutput("0 1");
-    setVerdict("success");
-    setIsRunning(false);
+      if (error) throw error;
+
+      setOutput(data.output);
+      setVerdict(data.status === "Executed" ? "info" : "error");
+    } catch (error) {
+      console.error("Run error:", error);
+      setOutput("Failed to execute code. Please try again.");
+      setVerdict("error");
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      toast.error("Please log in to submit");
+      navigate("/auth");
+      return;
+    }
+
     setIsSubmitting(true);
     setOutput(null);
     setVerdict(null);
 
-    // Simulate submission
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const { data, error } = await supabase.functions.invoke("python-judge", {
+        body: {
+          problem_id: id,
+          code,
+          user_id: user.id,
+          run_only: false,
+        },
+      });
 
-    setOutput("All test cases passed! +50 XP");
-    setVerdict("success");
-    setIsSubmitting(false);
+      if (error) throw error;
+
+      setOutput(data.output);
+      setVerdict(data.status === "Accepted" ? "success" : "error");
+
+      if (data.status === "Accepted") {
+        toast.success("🎉 Accepted! +50 XP");
+        refreshProfile();
+      } else {
+        toast.error(data.status);
+      }
+
+      fetchSubmissions();
+    } catch (error) {
+      console.error("Submit error:", error);
+      setOutput("Failed to submit code. Please try again.");
+      setVerdict("error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (isLoading || !problem) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <>
       <Helmet>
-        <title>{mockProblem.title} - PyChef</title>
+        <title>{problem.title} - PyChef</title>
         <meta
           name="description"
-          content={`Solve the ${mockProblem.title} problem on PyChef. ${mockProblem.difficulty} difficulty.`}
+          content={`Solve the ${problem.title} problem on PyChef. ${problem.difficulty} difficulty.`}
         />
       </Helmet>
 
@@ -129,19 +248,19 @@ const ProblemDetail = () => {
 
           <div className="flex items-center gap-3 flex-1">
             <h1 className="font-semibold text-foreground truncate">
-              {mockProblem.title}
+              {problem.title}
             </h1>
             <Badge
               variant="secondary"
               className={`${
-                mockProblem.difficulty === "Easy"
+                problem.difficulty === "Easy"
                   ? "bg-difficulty-easy/20 text-difficulty-easy"
-                  : mockProblem.difficulty === "Medium"
+                  : problem.difficulty === "Medium"
                   ? "bg-difficulty-medium/20 text-difficulty-medium"
                   : "bg-difficulty-hard/20 text-difficulty-hard"
               }`}
             >
-              {mockProblem.difficulty}
+              {problem.difficulty}
             </Badge>
           </div>
 
@@ -185,7 +304,6 @@ const ProblemDetail = () => {
               isDescriptionExpanded ? "lg:w-1/2" : "lg:w-12"
             } border-r border-border bg-card overflow-hidden transition-all duration-300 flex flex-col`}
           >
-            {/* Toggle Button (Desktop) */}
             <button
               onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
               className="hidden lg:flex items-center justify-center h-10 border-b border-border hover:bg-secondary transition-colors"
@@ -211,54 +329,56 @@ const ProblemDetail = () => {
                       value="submissions"
                       className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
                     >
-                      Submissions
+                      Submissions ({submissions.length})
                     </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="description" className="p-6 m-0">
                     <div className="prose prose-invert max-w-none">
-                      {/* Problem Statement */}
                       <div className="mb-6">
                         <p className="text-foreground whitespace-pre-line">
-                          {mockProblem.statement}
+                          {problem.statement}
                         </p>
                       </div>
 
-                      {/* Input/Output Format */}
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Input Format
-                        </h3>
-                        <p className="text-muted-foreground text-sm whitespace-pre-line">
-                          {mockProblem.inputFormat}
-                        </p>
-                      </div>
+                      {problem.input_format && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                            Input Format
+                          </h3>
+                          <p className="text-muted-foreground text-sm whitespace-pre-line">
+                            {problem.input_format}
+                          </p>
+                        </div>
+                      )}
 
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Output Format
-                        </h3>
-                        <p className="text-muted-foreground text-sm">
-                          {mockProblem.outputFormat}
-                        </p>
-                      </div>
+                      {problem.output_format && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                            Output Format
+                          </h3>
+                          <p className="text-muted-foreground text-sm">
+                            {problem.output_format}
+                          </p>
+                        </div>
+                      )}
 
-                      {/* Constraints */}
-                      <div className="mb-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          Constraints
-                        </h3>
-                        <pre className="text-sm text-muted-foreground bg-secondary p-4 rounded-lg whitespace-pre-line">
-                          {mockProblem.constraints}
-                        </pre>
-                      </div>
+                      {problem.constraints && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                            Constraints
+                          </h3>
+                          <pre className="text-sm text-muted-foreground bg-secondary p-4 rounded-lg whitespace-pre-line">
+                            {problem.constraints}
+                          </pre>
+                        </div>
+                      )}
 
-                      {/* Sample Test Cases */}
                       <div>
                         <h3 className="text-lg font-semibold text-foreground mb-4">
                           Examples
                         </h3>
-                        {mockProblem.samples.map((sample, index) => (
+                        {problem.samples.map((sample, index) => (
                           <div
                             key={index}
                             className="mb-4 rounded-lg border border-border overflow-hidden"
@@ -300,10 +420,9 @@ const ProblemDetail = () => {
                         ))}
                       </div>
 
-                      {/* Tags */}
                       <div className="mt-6 flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">Tags:</span>
-                        {mockProblem.tags.map((tag) => (
+                        {problem.tags.map((tag) => (
                           <Badge key={tag} variant="secondary">
                             {tag}
                           </Badge>
@@ -313,12 +432,43 @@ const ProblemDetail = () => {
                   </TabsContent>
 
                   <TabsContent value="submissions" className="p-6 m-0">
-                    <div className="text-center py-12">
-                      <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">
-                        Your submissions will appear here
-                      </p>
-                    </div>
+                    {submissions.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">
+                          No submissions yet
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {submissions.map((sub) => (
+                          <div
+                            key={sub.id}
+                            className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
+                          >
+                            <div className="flex items-center gap-3">
+                              {sub.status === "Accepted" ? (
+                                <CheckCircle2 className="h-5 w-5 text-accent" />
+                              ) : (
+                                <XCircle className="h-5 w-5 text-destructive" />
+                              )}
+                              <span
+                                className={`font-medium ${
+                                  sub.status === "Accepted"
+                                    ? "text-accent"
+                                    : "text-destructive"
+                                }`}
+                              >
+                                {sub.status}
+                              </span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(sub.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </div>
@@ -331,14 +481,12 @@ const ProblemDetail = () => {
             animate={{ opacity: 1, x: 0 }}
             className="flex-1 flex flex-col min-h-[400px] lg:min-h-0"
           >
-            {/* Editor Header */}
             <div className="h-10 border-b border-border bg-secondary/50 flex items-center px-4">
               <span className="text-sm text-muted-foreground font-mono">
                 solution.py
               </span>
             </div>
 
-            {/* Monaco Editor */}
             <div className="flex-1">
               <Editor
                 height="100%"
@@ -359,7 +507,6 @@ const ProblemDetail = () => {
               />
             </div>
 
-            {/* Output Panel */}
             {output && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -369,19 +516,31 @@ const ProblemDetail = () => {
                 <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
                   {verdict === "success" ? (
                     <CheckCircle2 className="h-5 w-5 text-accent" />
-                  ) : (
+                  ) : verdict === "error" ? (
                     <XCircle className="h-5 w-5 text-destructive" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-info" />
                   )}
                   <span
                     className={`text-sm font-semibold ${
-                      verdict === "success" ? "text-accent" : "text-destructive"
+                      verdict === "success"
+                        ? "text-accent"
+                        : verdict === "error"
+                        ? "text-destructive"
+                        : "text-info"
                     }`}
                   >
-                    {verdict === "success" ? "Accepted" : "Wrong Answer"}
+                    {verdict === "success"
+                      ? "Accepted"
+                      : verdict === "error"
+                      ? "Error"
+                      : "Output"}
                   </span>
                 </div>
-                <div className="p-4">
-                  <pre className="text-sm font-mono text-foreground">{output}</pre>
+                <div className="p-4 max-h-40 overflow-y-auto">
+                  <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
+                    {output}
+                  </pre>
                 </div>
               </motion.div>
             )}

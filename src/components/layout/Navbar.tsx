@@ -1,23 +1,25 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Code2, Menu, X, Trophy, BookOpen, User, LogOut } from "lucide-react";
+import { Code2, Menu, X, Trophy, BookOpen, User, LogOut, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-interface NavbarProps {
-  isAuthenticated?: boolean;
-  onLogout?: () => void;
-}
-
-const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
+const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAdmin, signOut, profile } = useAuth();
+
+  const isAuthenticated = !!user;
 
   const navLinks = isAuthenticated
     ? [
         { href: "/dashboard", label: "Dashboard", icon: User },
         { href: "/problems", label: "Problems", icon: BookOpen },
         { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
+        ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }] : []),
       ]
     : [
         { href: "/problems", label: "Problems", icon: BookOpen },
@@ -25,6 +27,12 @@ const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
       ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    await signOut();
+    toast.success("Logged out successfully");
+    navigate("/");
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -65,10 +73,10 @@ const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
                 <Link to="/profile">
                   <Button variant="ghost" size="sm">
                     <User className="h-4 w-4 mr-2" />
-                    Profile
+                    {profile?.name?.split(" ")[0] || "Profile"}
                   </Button>
                 </Link>
-                <Button variant="outline" size="sm" onClick={onLogout}>
+                <Button variant="outline" size="sm" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Logout
                 </Button>
@@ -140,7 +148,7 @@ const Navbar = ({ isAuthenticated = false, onLogout }: NavbarProps) => {
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      onLogout?.();
+                      handleLogout();
                     }}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   >
