@@ -45,7 +45,8 @@ import FloatingActionButtons from "@/components/mobile/FloatingActionButtons";
 import MobileViewToggle from "@/components/mobile/MobileViewToggle";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import KeyboardShortcutsDialog from "@/components/editor/KeyboardShortcutsDialog";
-import { useTheme } from "@/contexts/ThemeContext";
+import CodeHistoryPanel from "@/components/editor/CodeHistoryPanel";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface Sample {
   input: string;
@@ -115,6 +116,7 @@ const ProblemDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
+  const { settings } = useSettings();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
   
@@ -131,9 +133,18 @@ const ProblemDetail = () => {
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [editorTheme, setEditorTheme] = useState<"vs-dark" | "light">("vs-dark");
+  const [editorTheme, setEditorTheme] = useState(settings.editorTheme);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<"description" | "editor">("description");
+
+  // Handle loading code from history
+  const handleLoadCode = (historyCode: string) => {
+    setCode(historyCode);
+    if (id) {
+      localStorage.setItem(getStorageKey(id), historyCode);
+      setLastSaved(new Date());
+    }
+  };
 
   // Swipe gesture for mobile view toggle
   const swipeHandlers = useSwipeGesture({
@@ -813,6 +824,7 @@ const ProblemDetail = () => {
                   <span className="hidden sm:inline">{editorTheme === "vs-dark" ? "Light" : "Dark"}</span>
                 </Button>
                 <KeyboardShortcutsDialog />
+                {id && <CodeHistoryPanel problemId={id} onLoadCode={handleLoadCode} />}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -878,13 +890,13 @@ const ProblemDetail = () => {
                   checkPythonErrors(newCode);
                 }}
                 options={{
-                  fontSize: 14,
+                  fontSize: settings.fontSize,
                   fontFamily: "JetBrains Mono, monospace",
                   minimap: { enabled: false },
                   padding: { top: 16 },
-                  lineNumbers: "on",
+                  lineNumbers: settings.showLineNumbers ? "on" : "off",
                   scrollBeyondLastLine: false,
-                  wordWrap: "on",
+                  wordWrap: settings.wordWrap ? "on" : "off",
                   automaticLayout: true,
                   glyphMargin: true,
                 }}
