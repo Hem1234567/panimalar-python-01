@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { Medal, Loader2, Trophy } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { supabase } from "@/integrations/supabase/client";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/mobile/PullToRefreshIndicator";
 
 interface LeaderboardUser {
   user_id: string;
@@ -17,11 +19,7 @@ const Leaderboard = () => {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, []);
-
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
       .select("user_id, name, xp, level")
@@ -32,7 +30,15 @@ const Leaderboard = () => {
       setUsers(data);
     }
     setIsLoading(false);
-  };
+  }, []);
+
+  const { containerRef, pullDistance, isRefreshing, handlers } = usePullToRefresh({
+    onRefresh: fetchLeaderboard,
+  });
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   return (
     <>
@@ -42,7 +48,13 @@ const Leaderboard = () => {
       </Helmet>
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="pt-20 sm:pt-24 pb-16">
+        <main 
+          ref={containerRef}
+          className="pt-20 sm:pt-24 pb-16 relative overflow-auto"
+          {...handlers}
+        >
+          <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+          
           <div className="container mx-auto px-4">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 sm:mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Leaderboard</h1>
@@ -145,6 +157,11 @@ const Leaderboard = () => {
                 )}
               </div>
             )}
+
+            {/* Pull to refresh hint on mobile */}
+            <p className="text-center text-xs text-muted-foreground mt-4 md:hidden">
+              Pull down to refresh
+            </p>
           </div>
         </main>
         <Footer />

@@ -44,6 +44,8 @@ import { toast } from "sonner";
 import FloatingActionButtons from "@/components/mobile/FloatingActionButtons";
 import MobileViewToggle from "@/components/mobile/MobileViewToggle";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
+import KeyboardShortcutsDialog from "@/components/editor/KeyboardShortcutsDialog";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Sample {
   input: string;
@@ -810,6 +812,7 @@ const ProblemDetail = () => {
                   )}
                   <span className="hidden sm:inline">{editorTheme === "vs-dark" ? "Light" : "Dark"}</span>
                 </Button>
+                <KeyboardShortcutsDialog />
                 <Button
                   variant="ghost"
                   size="sm"
