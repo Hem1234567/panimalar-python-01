@@ -16,6 +16,7 @@ import {
   ChevronUp,
   AlertCircle,
   Save,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -168,6 +169,24 @@ const ProblemDetail = () => {
     editorRef.current = editorInstance;
     monacoRef.current = { editor: monaco.editor, MarkerSeverity: monaco.MarkerSeverity };
     checkPythonErrors(code);
+
+    // Add keyboard shortcuts
+    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      handleRun();
+    });
+    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+      handleSubmit();
+    });
+  };
+
+  const handleResetCode = () => {
+    if (id) {
+      localStorage.removeItem(getStorageKey(id));
+      setCode(defaultCode);
+      setLastSaved(null);
+      setValidationError(null);
+      toast.success("Code reset to default template");
+    }
   };
 
   useEffect(() => {
@@ -659,15 +678,31 @@ const ProblemDetail = () => {
             className="flex-1 flex flex-col min-h-[400px] lg:min-h-0"
           >
             <div className="h-10 border-b border-border bg-secondary/50 flex items-center px-4 justify-between">
-              <span className="text-sm text-muted-foreground font-mono">
-                solution.py
-              </span>
-              {lastSaved && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Save className="h-3 w-3" />
-                  <span>Saved {lastSaved.toLocaleTimeString()}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground font-mono">
+                  solution.py
+                </span>
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  Ctrl+Enter: Run | Ctrl+Shift+Enter: Submit
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                {lastSaved && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Save className="h-3 w-3" />
+                    <span>Saved {lastSaved.toLocaleTimeString()}</span>
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetCode}
+                  className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Reset
+                </Button>
+              </div>
             </div>
 
             <div className="flex-1">
