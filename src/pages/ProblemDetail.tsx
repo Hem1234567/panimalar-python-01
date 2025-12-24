@@ -795,11 +795,11 @@ const ProblemDetail = () => {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`flex-col ${
+            className={`flex flex-col ${
               isFullscreen 
                 ? "fixed inset-0 z-50 bg-background" 
-                : "md:flex-1 min-h-[400px] md:min-h-0"
-            } ${mobileView === "editor" ? "flex flex-1" : "hidden md:flex"}`}
+                : "md:flex-1 md:min-h-0"
+            } ${mobileView === "editor" ? "flex flex-1 h-full overflow-hidden" : "hidden md:flex"}`}
           >
             <div className="h-auto min-h-10 border-b border-border bg-secondary/50 flex flex-wrap items-center px-2 sm:px-4 py-2 gap-2 justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
@@ -896,7 +896,7 @@ const ProblemDetail = () => {
               </div>
             </div>
 
-            <div className="flex-1 pb-24 md:pb-0">
+            <div className="flex-1 min-h-0 pb-24 md:pb-0 relative">
               <Editor
                 height="100%"
                 defaultLanguage="python"
