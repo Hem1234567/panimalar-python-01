@@ -114,7 +114,7 @@ const ProblemDetail = () => {
       input_format: data.input_format || "",
       output_format: data.output_format || "",
       constraints: data.constraints || "",
-      samples: samplesData as Sample[],
+      samples: samplesData as unknown as Sample[],
       time_limit: data.time_limit,
     };
 
