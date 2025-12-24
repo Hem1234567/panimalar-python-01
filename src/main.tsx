@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./App.css";
 
 // Security: Add meta tags for Content Security Policy
 if (import.meta.env.PROD) {
