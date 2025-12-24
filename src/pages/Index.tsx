@@ -1,13 +1,31 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Helmet } from "react-helmet-async";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+import HeroSection from "@/components/landing/HeroSection";
+import FeaturesSection from "@/components/landing/FeaturesSection";
+import CTASection from "@/components/landing/CTASection";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <>
+      <Helmet>
+        <title>PyChef - Master Python Through Competitive Coding</title>
+        <meta
+          name="description"
+          content="Practice Python algorithms, compete on leaderboards, and level up your coding skills. The ultimate competitive programming platform for Python developers."
+        />
+      </Helmet>
+      
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-16">
+          <HeroSection />
+          <FeaturesSection />
+          <CTASection />
+        </main>
+        <Footer />
       </div>
-    </div>
+    </>
   );
 };
 
