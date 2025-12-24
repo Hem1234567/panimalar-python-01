@@ -17,6 +17,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Submissions from "./pages/Submissions";
 import Admin from "./pages/Admin";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/submissions" element={<Submissions />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/install" element={<Install />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
