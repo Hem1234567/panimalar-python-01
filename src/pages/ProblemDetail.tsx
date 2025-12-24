@@ -48,6 +48,12 @@ interface Submission {
   execution_time: number;
 }
 
+interface ExecutionStep {
+  step: string;
+  status: "pending" | "running" | "done" | "error";
+  message?: string;
+}
+
 const defaultCode = `# Write your Python solution here
 
 def solve():
@@ -77,6 +83,8 @@ const ProblemDetail = () => {
   const [output, setOutput] = useState<string | null>(null);
   const [verdict, setVerdict] = useState<"success" | "error" | "info" | null>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(true);
+  const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -138,6 +146,38 @@ const ProblemDetail = () => {
     }
   };
 
+  const validateCode = (): boolean => {
+    setValidationError(null);
+    
+    const trimmedCode = code.trim();
+    
+    if (!trimmedCode) {
+      setValidationError("Code cannot be empty");
+      toast.error("Please write some code before running");
+      return false;
+    }
+    
+    if (trimmedCode === defaultCode.trim()) {
+      setValidationError("Please modify the default template");
+      toast.error("Please write your solution before running");
+      return false;
+    }
+    
+    if (trimmedCode.length < 10) {
+      setValidationError("Code is too short");
+      toast.error("Code seems incomplete");
+      return false;
+    }
+    
+    return true;
+  };
+
+  const updateStep = (stepIndex: number, status: ExecutionStep["status"], message?: string) => {
+    setExecutionSteps(prev => prev.map((step, i) => 
+      i === stepIndex ? { ...step, status, message } : step
+    ));
+  };
+
   const handleRun = async () => {
     if (!user) {
       toast.error("Please log in to run code");
@@ -145,11 +185,28 @@ const ProblemDetail = () => {
       return;
     }
 
+    if (!validateCode()) return;
+
     setIsRunning(true);
     setOutput(null);
     setVerdict(null);
+    setExecutionSteps([
+      { step: "Parsing code", status: "running" },
+      { step: "Validating syntax", status: "pending" },
+      { step: "Running with sample input", status: "pending" },
+      { step: "Generating output", status: "pending" },
+    ]);
 
     try {
+      // Simulate step progression
+      await new Promise(r => setTimeout(r, 300));
+      updateStep(0, "done");
+      updateStep(1, "running");
+      
+      await new Promise(r => setTimeout(r, 300));
+      updateStep(1, "done");
+      updateStep(2, "running");
+
       const { data, error } = await supabase.functions.invoke("python-judge", {
         body: {
           problem_id: id,
@@ -161,10 +218,18 @@ const ProblemDetail = () => {
 
       if (error) throw error;
 
+      updateStep(2, "done");
+      updateStep(3, "running");
+      await new Promise(r => setTimeout(r, 200));
+      updateStep(3, "done");
+
       setOutput(data.output);
       setVerdict(data.status === "Executed" ? "info" : "error");
     } catch (error) {
       console.error("Run error:", error);
+      setExecutionSteps(prev => prev.map(step => 
+        step.status === "running" ? { ...step, status: "error" } : step
+      ));
       setOutput("Failed to execute code. Please try again.");
       setVerdict("error");
     } finally {
@@ -179,11 +244,28 @@ const ProblemDetail = () => {
       return;
     }
 
+    if (!validateCode()) return;
+
     setIsSubmitting(true);
     setOutput(null);
     setVerdict(null);
+    setExecutionSteps([
+      { step: "Parsing code", status: "running" },
+      { step: "Validating syntax", status: "pending" },
+      { step: "Running test cases", status: "pending" },
+      { step: "Comparing outputs", status: "pending" },
+      { step: "Recording submission", status: "pending" },
+    ]);
 
     try {
+      await new Promise(r => setTimeout(r, 300));
+      updateStep(0, "done");
+      updateStep(1, "running");
+      
+      await new Promise(r => setTimeout(r, 300));
+      updateStep(1, "done");
+      updateStep(2, "running");
+
       const { data, error } = await supabase.functions.invoke("python-judge", {
         body: {
           problem_id: id,
@@ -194,6 +276,14 @@ const ProblemDetail = () => {
       });
 
       if (error) throw error;
+
+      updateStep(2, "done");
+      updateStep(3, "running");
+      await new Promise(r => setTimeout(r, 200));
+      updateStep(3, "done");
+      updateStep(4, "running");
+      await new Promise(r => setTimeout(r, 200));
+      updateStep(4, "done");
 
       setOutput(data.output);
       setVerdict(data.status === "Accepted" ? "success" : "error");
@@ -208,6 +298,9 @@ const ProblemDetail = () => {
       fetchSubmissions();
     } catch (error) {
       console.error("Submit error:", error);
+      setExecutionSteps(prev => prev.map(step => 
+        step.status === "running" ? { ...step, status: "error" } : step
+      ));
       setOutput("Failed to submit code. Please try again.");
       setVerdict("error");
     } finally {
@@ -493,7 +586,10 @@ const ProblemDetail = () => {
                 defaultLanguage="python"
                 theme="vs-dark"
                 value={code}
-                onChange={(value) => setCode(value || "")}
+                onChange={(value) => {
+                  setCode(value || "");
+                  if (validationError) setValidationError(null);
+                }}
                 options={{
                   fontSize: 14,
                   fontFamily: "JetBrains Mono, monospace",
@@ -507,7 +603,63 @@ const ProblemDetail = () => {
               />
             </div>
 
-            {output && (
+            {/* Validation Error */}
+            {validationError && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="border-t border-destructive/30 bg-destructive/10 px-4 py-3"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm text-destructive">{validationError}</span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Execution Steps */}
+            {(isRunning || isSubmitting) && executionSteps.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="border-t border-border bg-card px-4 py-3"
+              >
+                <div className="space-y-2">
+                  {executionSteps.map((step, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      {step.status === "pending" && (
+                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                      )}
+                      {step.status === "running" && (
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      )}
+                      {step.status === "done" && (
+                        <CheckCircle2 className="h-4 w-4 text-accent" />
+                      )}
+                      {step.status === "error" && (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      )}
+                      <span
+                        className={`text-sm ${
+                          step.status === "running"
+                            ? "text-primary font-medium"
+                            : step.status === "done"
+                            ? "text-accent"
+                            : step.status === "error"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {step.step}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Output */}
+            {output && !isRunning && !isSubmitting && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
