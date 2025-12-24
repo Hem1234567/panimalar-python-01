@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Editor, { OnMount } from "@monaco-editor/react";
 import { editor, MarkerSeverity } from "monaco-editor";
 import {
@@ -41,6 +41,9 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import FloatingActionButtons from "@/components/mobile/FloatingActionButtons";
+import MobileViewToggle from "@/components/mobile/MobileViewToggle";
+import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 
 interface Sample {
   input: string;
@@ -128,6 +131,14 @@ const ProblemDetail = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [editorTheme, setEditorTheme] = useState<"vs-dark" | "light">("vs-dark");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mobileView, setMobileView] = useState<"description" | "editor">("description");
+
+  // Swipe gesture for mobile view toggle
+  const swipeHandlers = useSwipeGesture({
+    threshold: 75,
+    onSwipeLeft: () => setMobileView("editor"),
+    onSwipeRight: () => setMobileView("description"),
+  });
 
   // Load saved code from localStorage
   useEffect(() => {
@@ -149,7 +160,7 @@ const ProblemDetail = () => {
         localStorage.setItem(getStorageKey(id), code);
         setLastSaved(new Date());
       }
-    }, 1000); // Save after 1 second of inactivity
+    }, 1000);
 
     return () => clearTimeout(timeoutId);
   }, [code, id]);
@@ -218,22 +229,18 @@ const ProblemDetail = () => {
     for (let line of lines) {
       const trimmedLine = line.trim();
       
-      // Skip empty lines
       if (trimmedLine === "") {
         formattedLines.push("");
         continue;
       }
 
-      // Decrease indent for these keywords at the start
       if (/^(elif|else|except|finally)\b/.test(trimmedLine)) {
         indentLevel = Math.max(0, indentLevel - 1);
       }
 
-      // Add proper indentation
       const indent = " ".repeat(indentLevel * indentSize);
       let formattedLine = indent + trimmedLine;
 
-      // Fix spacing around operators
       formattedLine = formattedLine
         .replace(/\s*=\s*/g, " = ")
         .replace(/\s*==\s*/g, " == ")
@@ -245,21 +252,14 @@ const ProblemDetail = () => {
         .replace(/,\s*/g, ", ")
         .replace(/\s+,/g, ",");
 
-      // Fix multiple spaces (except in strings and at line start)
       const leadingSpaces = formattedLine.match(/^\s*/)?.[0] || "";
       const restOfLine = formattedLine.slice(leadingSpaces.length);
       formattedLine = leadingSpaces + restOfLine.replace(/  +/g, " ");
 
       formattedLines.push(formattedLine);
 
-      // Increase indent after colons (for blocks)
       if (trimmedLine.endsWith(":")) {
         indentLevel++;
-      }
-
-      // Handle return/break/continue/pass - might decrease indent on next non-empty line
-      if (/^(return|break|continue|pass)\b/.test(trimmedLine) && !trimmedLine.endsWith(":")) {
-        // Don't automatically decrease, let the next block keyword handle it
       }
     }
 
@@ -293,7 +293,6 @@ const ProblemDetail = () => {
       return;
     }
 
-    // Cast the data properly
     const samplesData = Array.isArray(data.samples) ? data.samples : [];
     const problemData: Problem = {
       id: data.id,
@@ -380,7 +379,6 @@ const ProblemDetail = () => {
     ]);
 
     try {
-      // Simulate step progression
       await new Promise(r => setTimeout(r, 300));
       updateStep(0, "done");
       updateStep(1, "running");
@@ -539,7 +537,8 @@ const ProblemDetail = () => {
             </Badge>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
+          {/* Desktop Run/Submit buttons */}
+          <div className="hidden md:flex items-center gap-1 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -571,19 +570,27 @@ const ProblemDetail = () => {
           </div>
         </header>
 
+        {/* Mobile View Toggle */}
+        <MobileViewToggle activeView={mobileView} onViewChange={setMobileView} />
+
         {/* Main Content */}
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* Problem Description */}
+        <div 
+          className="flex-1 flex flex-col md:flex-row overflow-hidden"
+          {...swipeHandlers}
+        >
+          {/* Problem Description - Desktop always visible, Mobile conditional */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className={`${
-              isDescriptionExpanded ? "lg:w-1/2" : "lg:w-12"
-            } border-r border-border bg-card overflow-hidden transition-all duration-300 flex flex-col`}
+              isDescriptionExpanded ? "md:w-1/2" : "md:w-12"
+            } border-r border-border bg-card overflow-hidden transition-all duration-300 flex-col ${
+              mobileView === "description" ? "flex" : "hidden md:flex"
+            } ${mobileView === "description" ? "flex-1" : ""}`}
           >
             <button
               onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-              className="hidden lg:flex items-center justify-center h-10 border-b border-border hover:bg-secondary transition-colors"
+              className="hidden md:flex items-center justify-center h-10 border-b border-border hover:bg-secondary transition-colors"
             >
               {isDescriptionExpanded ? (
                 <ChevronDown className="h-4 w-4 rotate-90" />
@@ -593,37 +600,37 @@ const ProblemDetail = () => {
             </button>
 
             {isDescriptionExpanded && (
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto pb-24 md:pb-0">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
                   <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent p-0 h-auto">
                     <TabsTrigger
                       value="description"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 text-sm"
                     >
                       Description
                     </TabsTrigger>
                     <TabsTrigger
                       value="submissions"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 text-sm"
                     >
                       Submissions ({submissions.length})
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="description" className="p-6 m-0">
+                  <TabsContent value="description" className="p-4 sm:p-6 m-0">
                     <div className="prose prose-invert max-w-none">
                       <div className="mb-6">
-                        <p className="text-foreground whitespace-pre-line">
+                        <p className="text-foreground whitespace-pre-line text-sm sm:text-base">
                           {problem.statement}
                         </p>
                       </div>
 
                       {problem.input_format && (
                         <div className="mb-6">
-                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
                             Input Format
                           </h3>
-                          <p className="text-muted-foreground text-sm whitespace-pre-line">
+                          <p className="text-muted-foreground text-xs sm:text-sm whitespace-pre-line">
                             {problem.input_format}
                           </p>
                         </div>
@@ -631,10 +638,10 @@ const ProblemDetail = () => {
 
                       {problem.output_format && (
                         <div className="mb-6">
-                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
                             Output Format
                           </h3>
-                          <p className="text-muted-foreground text-sm">
+                          <p className="text-muted-foreground text-xs sm:text-sm">
                             {problem.output_format}
                           </p>
                         </div>
@@ -642,17 +649,17 @@ const ProblemDetail = () => {
 
                       {problem.constraints && (
                         <div className="mb-6">
-                          <h3 className="text-lg font-semibold text-foreground mb-2">
+                          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
                             Constraints
                           </h3>
-                          <pre className="text-sm text-muted-foreground bg-secondary p-4 rounded-lg whitespace-pre-line">
+                          <pre className="text-xs sm:text-sm text-muted-foreground bg-secondary p-3 sm:p-4 rounded-lg whitespace-pre-line overflow-x-auto">
                             {problem.constraints}
                           </pre>
                         </div>
                       )}
 
                       <div>
-                        <h3 className="text-lg font-semibold text-foreground mb-4">
+                        <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">
                           Examples
                         </h3>
                         {problem.samples.map((sample, index) => (
@@ -660,17 +667,17 @@ const ProblemDetail = () => {
                             key={index}
                             className="mb-4 rounded-lg border border-border overflow-hidden"
                           >
-                            <div className="bg-secondary/50 px-4 py-2 border-b border-border">
-                              <span className="text-sm font-medium text-foreground">
+                            <div className="bg-secondary/50 px-3 sm:px-4 py-2 border-b border-border">
+                              <span className="text-xs sm:text-sm font-medium text-foreground">
                                 Example {index + 1}
                               </span>
                             </div>
-                            <div className="p-4 space-y-3">
+                            <div className="p-3 sm:p-4 space-y-3">
                               <div>
                                 <span className="text-xs text-muted-foreground uppercase tracking-wide">
                                   Input
                                 </span>
-                                <pre className="mt-1 p-3 bg-secondary rounded text-sm font-mono text-foreground">
+                                <pre className="mt-1 p-2 sm:p-3 bg-secondary rounded text-xs sm:text-sm font-mono text-foreground overflow-x-auto">
                                   {sample.input}
                                 </pre>
                               </div>
@@ -678,7 +685,7 @@ const ProblemDetail = () => {
                                 <span className="text-xs text-muted-foreground uppercase tracking-wide">
                                   Output
                                 </span>
-                                <pre className="mt-1 p-3 bg-secondary rounded text-sm font-mono text-foreground">
+                                <pre className="mt-1 p-2 sm:p-3 bg-secondary rounded text-xs sm:text-sm font-mono text-foreground overflow-x-auto">
                                   {sample.output}
                                 </pre>
                               </div>
@@ -687,7 +694,7 @@ const ProblemDetail = () => {
                                   <span className="text-xs text-muted-foreground uppercase tracking-wide">
                                     Explanation
                                   </span>
-                                  <p className="mt-1 text-sm text-muted-foreground">
+                                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
                                     {sample.explanation}
                                   </p>
                                 </div>
@@ -697,10 +704,10 @@ const ProblemDetail = () => {
                         ))}
                       </div>
 
-                      <div className="mt-6 flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Tags:</span>
+                      <div className="mt-6 flex items-center gap-2 flex-wrap">
+                        <span className="text-xs sm:text-sm text-muted-foreground">Tags:</span>
                         {problem.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary">
+                          <Badge key={tag} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
                         ))}
@@ -708,7 +715,7 @@ const ProblemDetail = () => {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="submissions" className="p-6 m-0">
+                  <TabsContent value="submissions" className="p-4 sm:p-6 m-0">
                     {submissions.length === 0 ? (
                       <div className="text-center py-12">
                         <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -730,7 +737,7 @@ const ProblemDetail = () => {
                                 <XCircle className="h-5 w-5 text-destructive" />
                               )}
                               <span
-                                className={`font-medium ${
+                                className={`font-medium text-sm ${
                                   sub.status === "Accepted"
                                     ? "text-accent"
                                     : "text-destructive"
@@ -739,7 +746,7 @@ const ProblemDetail = () => {
                                 {sub.status}
                               </span>
                             </div>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-xs sm:text-sm text-muted-foreground">
                               {new Date(sub.created_at).toLocaleString()}
                             </span>
                           </div>
@@ -752,15 +759,15 @@ const ProblemDetail = () => {
             )}
           </motion.div>
 
-          {/* Code Editor */}
+          {/* Code Editor - Desktop always visible, Mobile conditional */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`flex flex-col ${
+            className={`flex-col ${
               isFullscreen 
                 ? "fixed inset-0 z-50 bg-background" 
-                : "flex-1 min-h-[400px] lg:min-h-0"
-            }`}
+                : "md:flex-1 min-h-[400px] md:min-h-0"
+            } ${mobileView === "editor" ? "flex flex-1" : "hidden md:flex"}`}
           >
             <div className="h-auto min-h-10 border-b border-border bg-secondary/50 flex flex-wrap items-center px-2 sm:px-4 py-2 gap-2 justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
@@ -816,7 +823,7 @@ const ProblemDetail = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hidden sm:flex"
                 >
                   {isFullscreen ? (
                     <Minimize2 className="h-3 w-3 sm:mr-1" />
@@ -854,7 +861,7 @@ const ProblemDetail = () => {
               </div>
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1 pb-24 md:pb-0">
               <Editor
                 height="100%"
                 defaultLanguage="python"
@@ -904,12 +911,12 @@ const ProblemDetail = () => {
               >
                 <div className="space-y-2">
                   {executionSteps.map((step, index) => (
-                    <div key={index} className="flex items-center gap-3">
+                    <div key={index} className="flex items-center gap-2">
                       {step.status === "pending" && (
                         <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
                       )}
                       {step.status === "running" && (
-                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
                       )}
                       {step.status === "done" && (
                         <CheckCircle2 className="h-4 w-4 text-accent" />
@@ -917,17 +924,12 @@ const ProblemDetail = () => {
                       {step.status === "error" && (
                         <XCircle className="h-4 w-4 text-destructive" />
                       )}
-                      <span
-                        className={`text-sm ${
-                          step.status === "running"
-                            ? "text-primary font-medium"
-                            : step.status === "done"
-                            ? "text-accent"
-                            : step.status === "error"
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                        }`}
-                      >
+                      <span className={`text-xs sm:text-sm ${
+                        step.status === "pending" ? "text-muted-foreground" :
+                        step.status === "running" ? "text-foreground" :
+                        step.status === "done" ? "text-accent" :
+                        "text-destructive"
+                      }`}>
                         {step.step}
                       </span>
                     </div>
@@ -936,39 +938,32 @@ const ProblemDetail = () => {
               </motion.div>
             )}
 
-            {/* Output */}
-            {output && !isRunning && !isSubmitting && (
+            {/* Output Panel */}
+            {output && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="border-t border-border bg-card"
+                className={`border-t ${
+                  verdict === "success" ? "border-accent/30 bg-accent/10" :
+                  verdict === "error" ? "border-destructive/30 bg-destructive/10" :
+                  "border-border bg-card"
+                } px-4 py-3`}
               >
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
-                  {verdict === "success" ? (
-                    <CheckCircle2 className="h-5 w-5 text-accent" />
-                  ) : verdict === "error" ? (
-                    <XCircle className="h-5 w-5 text-destructive" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-info" />
+                <div className="flex items-start gap-2">
+                  {verdict === "success" && (
+                    <CheckCircle2 className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                   )}
-                  <span
-                    className={`text-sm font-semibold ${
-                      verdict === "success"
-                        ? "text-accent"
-                        : verdict === "error"
-                        ? "text-destructive"
-                        : "text-info"
-                    }`}
-                  >
-                    {verdict === "success"
-                      ? "Accepted"
-                      : verdict === "error"
-                      ? "Error"
-                      : "Output"}
-                  </span>
-                </div>
-                <div className="p-4 max-h-40 overflow-y-auto">
-                  <pre className="text-sm font-mono text-foreground whitespace-pre-wrap">
+                  {verdict === "error" && (
+                    <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  )}
+                  {verdict === "info" && (
+                    <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  )}
+                  <pre className={`text-xs sm:text-sm font-mono whitespace-pre-wrap ${
+                    verdict === "success" ? "text-accent" :
+                    verdict === "error" ? "text-destructive" :
+                    "text-foreground"
+                  }`}>
                     {output}
                   </pre>
                 </div>
@@ -976,6 +971,14 @@ const ProblemDetail = () => {
             )}
           </motion.div>
         </div>
+
+        {/* Mobile Floating Action Buttons */}
+        <FloatingActionButtons
+          onRun={handleRun}
+          onSubmit={handleSubmit}
+          isRunning={isRunning}
+          isSubmitting={isSubmitting}
+        />
       </div>
     </>
   );
