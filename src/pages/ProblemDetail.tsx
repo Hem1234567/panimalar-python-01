@@ -23,6 +23,7 @@ import {
   Moon,
   Maximize2,
   Minimize2,
+  Terminal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -142,7 +143,7 @@ const ProblemDetail = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [editorTheme, setEditorTheme] = useState(settings.editorTheme);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [mobileView, setMobileView] = useState<"description" | "editor">("description");
+  const [mobileView, setMobileView] = useState<"description" | "editor" | "output">("description");
 
   // Handle loading code from history
   const handleLoadCode = (historyCode: string) => {
@@ -391,6 +392,10 @@ const ProblemDetail = () => {
     setIsRunning(true);
     setOutput(null);
     setVerdict(null);
+    // Auto-switch to output view on mobile when running
+    if (window.innerWidth < 768) {
+      setMobileView("output");
+    }
     setExecutionSteps([
       { step: "Parsing code", status: "running" },
       { step: "Validating syntax", status: "pending" },
@@ -449,6 +454,10 @@ const ProblemDetail = () => {
     setIsSubmitting(true);
     setOutput(null);
     setVerdict(null);
+    // Auto-switch to output view on mobile when submitting
+    if (window.innerWidth < 768) {
+      setMobileView("output");
+    }
     setExecutionSteps([
       { step: "Parsing code", status: "running" },
       { step: "Validating syntax", status: "pending" },
@@ -603,7 +612,7 @@ const ProblemDetail = () => {
         </header>
 
         {/* Mobile View Toggle */}
-        <MobileViewToggle activeView={mobileView} onViewChange={setMobileView} />
+        <MobileViewToggle activeView={mobileView} onViewChange={setMobileView} hasOutput={!!output} />
 
         {/* Main Content */}
         <div 
@@ -973,12 +982,12 @@ const ProblemDetail = () => {
               </motion.div>
             )}
 
-            {/* Output Panel */}
+            {/* Output Panel - Desktop only */}
             {output && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`border-t ${
+                className={`hidden md:block border-t ${
                   verdict === "success" ? "border-accent/30 bg-accent/10" :
                   verdict === "error" ? "border-destructive/30 bg-destructive/10" :
                   "border-border bg-card"
@@ -1004,6 +1013,84 @@ const ProblemDetail = () => {
                 </div>
               </motion.div>
             )}
+          </motion.div>
+
+          {/* Mobile Output View */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className={`flex-1 flex-col bg-card overflow-auto ${
+              mobileView === "output" ? "flex md:hidden" : "hidden"
+            }`}
+          >
+            <div className="h-auto min-h-10 border-b border-border bg-secondary/50 flex items-center px-4 py-2">
+              <span className="text-sm font-medium text-foreground">Output</span>
+            </div>
+            <div className="flex-1 p-4">
+              {/* Execution Steps on Mobile */}
+              {(isRunning || isSubmitting) && executionSteps.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {executionSteps.map((step, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      {step.status === "pending" && (
+                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                      )}
+                      {step.status === "running" && (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      )}
+                      {step.status === "done" && (
+                        <CheckCircle2 className="h-4 w-4 text-accent" />
+                      )}
+                      {step.status === "error" && (
+                        <XCircle className="h-4 w-4 text-destructive" />
+                      )}
+                      <span className={`text-sm ${
+                        step.status === "pending" ? "text-muted-foreground" :
+                        step.status === "running" ? "text-foreground" :
+                        step.status === "done" ? "text-accent" :
+                        "text-destructive"
+                      }`}>
+                        {step.step}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Output Content */}
+              {output ? (
+                <div className={`rounded-lg p-4 ${
+                  verdict === "success" ? "bg-accent/10 border border-accent/30" :
+                  verdict === "error" ? "bg-destructive/10 border border-destructive/30" :
+                  "bg-secondary border border-border"
+                }`}>
+                  <div className="flex items-start gap-3">
+                    {verdict === "success" && (
+                      <CheckCircle2 className="h-6 w-6 text-accent shrink-0" />
+                    )}
+                    {verdict === "error" && (
+                      <XCircle className="h-6 w-6 text-destructive shrink-0" />
+                    )}
+                    {verdict === "info" && (
+                      <AlertCircle className="h-6 w-6 text-primary shrink-0" />
+                    )}
+                    <pre className={`text-sm font-mono whitespace-pre-wrap flex-1 ${
+                      verdict === "success" ? "text-accent" :
+                      verdict === "error" ? "text-destructive" :
+                      "text-foreground"
+                    }`}>
+                      {output}
+                    </pre>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                  <Terminal className="h-12 w-12 mb-4 opacity-50" />
+                  <p className="text-lg font-medium">No output yet</p>
+                  <p className="text-sm mt-1">Run your code to see the output here</p>
+                </div>
+              )}
+            </div>
           </motion.div>
         </div>
 

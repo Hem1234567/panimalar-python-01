@@ -1,12 +1,12 @@
-import { motion } from "framer-motion";
-import { FileText, Code } from "lucide-react";
+import { FileText, Code, Terminal } from "lucide-react";
 
 interface MobileViewToggleProps {
-  activeView: "description" | "editor";
-  onViewChange: (view: "description" | "editor") => void;
+  activeView: "description" | "editor" | "output";
+  onViewChange: (view: "description" | "editor" | "output") => void;
+  hasOutput?: boolean;
 }
 
-const MobileViewToggle = ({ activeView, onViewChange }: MobileViewToggleProps) => {
+const MobileViewToggle = ({ activeView, onViewChange, hasOutput = false }: MobileViewToggleProps) => {
   return (
     <div className="flex md:hidden bg-secondary border-b border-border p-1 gap-1">
       <button
@@ -30,6 +30,17 @@ const MobileViewToggle = ({ activeView, onViewChange }: MobileViewToggleProps) =
       >
         <Code className="h-4 w-4" />
         Code
+      </button>
+      <button
+        onClick={() => onViewChange("output")}
+        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          activeView === "output"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+        } ${hasOutput ? "animate-pulse" : ""}`}
+      >
+        <Terminal className="h-4 w-4" />
+        Output
       </button>
     </div>
   );
