@@ -510,24 +510,24 @@ const ProblemDetail = () => {
 
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
-        <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4">
+        <header className="h-12 sm:h-14 border-b border-border bg-card flex items-center px-2 sm:px-4 gap-2 sm:gap-4">
           <Link
             to="/problems"
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 sm:gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Problems</span>
           </Link>
 
-          <div className="h-6 w-px bg-border" />
+          <div className="h-6 w-px bg-border hidden sm:block" />
 
-          <div className="flex items-center gap-3 flex-1">
-            <h1 className="font-semibold text-foreground truncate">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <h1 className="font-semibold text-foreground truncate text-sm sm:text-base">
               {problem.title}
             </h1>
             <Badge
               variant="secondary"
-              className={`${
+              className={`text-xs shrink-0 ${
                 problem.difficulty === "Easy"
                   ? "bg-difficulty-easy/20 text-difficulty-easy"
                   : problem.difficulty === "Medium"
@@ -539,32 +539,34 @@ const ProblemDetail = () => {
             </Badge>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={handleRun}
               disabled={isRunning || isSubmitting}
+              className="px-2 sm:px-3"
             >
               {isRunning ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
               ) : (
-                <Play className="h-4 w-4 mr-2" />
+                <Play className="h-4 w-4 sm:mr-2" />
               )}
-              Run
+              <span className="hidden sm:inline">Run</span>
             </Button>
             <Button
               variant="hero"
               size="sm"
               onClick={handleSubmit}
               disabled={isRunning || isSubmitting}
+              className="px-2 sm:px-3"
             >
               {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
               ) : (
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 sm:mr-2" />
               )}
-              Submit
+              <span className="hidden sm:inline">Submit</span>
             </Button>
           </div>
         </header>
@@ -760,18 +762,18 @@ const ProblemDetail = () => {
                 : "flex-1 min-h-[400px] lg:min-h-0"
             }`}
           >
-            <div className="h-10 border-b border-border bg-secondary/50 flex items-center px-4 justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-muted-foreground font-mono">
+            <div className="h-auto min-h-10 border-b border-border bg-secondary/50 flex flex-wrap items-center px-2 sm:px-4 py-2 gap-2 justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-xs sm:text-sm text-muted-foreground font-mono">
                   solution.py
                 </span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">
+                <span className="text-xs text-muted-foreground hidden lg:inline">
                   Ctrl+Enter: Run | Ctrl+Shift+Enter: Submit
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                 {lastSaved && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
                     <Save className="h-3 w-3" />
                     <span>Saved {lastSaved.toLocaleTimeString()}</span>
                   </div>
@@ -783,58 +785,58 @@ const ProblemDetail = () => {
                     navigator.clipboard.writeText(code);
                     toast.success("Code copied to clipboard");
                   }}
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
+                  <Copy className="h-3 w-3 sm:mr-1" />
+                  <span className="hidden sm:inline">Copy</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setEditorTheme(editorTheme === "vs-dark" ? "light" : "vs-dark")}
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   {editorTheme === "vs-dark" ? (
-                    <Sun className="h-3 w-3 mr-1" />
+                    <Sun className="h-3 w-3 sm:mr-1" />
                   ) : (
-                    <Moon className="h-3 w-3 mr-1" />
+                    <Moon className="h-3 w-3 sm:mr-1" />
                   )}
-                  {editorTheme === "vs-dark" ? "Light" : "Dark"}
+                  <span className="hidden sm:inline">{editorTheme === "vs-dark" ? "Light" : "Dark"}</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={formatPythonCode}
-                  className="h-7 text-xs text-muted-foreground hover:text-primary"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
                 >
-                  <Wand2 className="h-3 w-3 mr-1" />
-                  Format
+                  <Wand2 className="h-3 w-3 sm:mr-1" />
+                  <span className="hidden sm:inline">Format</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 >
                   {isFullscreen ? (
-                    <Minimize2 className="h-3 w-3 mr-1" />
+                    <Minimize2 className="h-3 w-3 sm:mr-1" />
                   ) : (
-                    <Maximize2 className="h-3 w-3 mr-1" />
+                    <Maximize2 className="h-3 w-3 sm:mr-1" />
                   )}
-                  {isFullscreen ? "Exit" : "Fullscreen"}
+                  <span className="hidden sm:inline">{isFullscreen ? "Exit" : "Fullscreen"}</span>
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
                     >
-                      <RotateCcw className="h-3 w-3 mr-1" />
-                      Reset
+                      <RotateCcw className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Reset</span>
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Reset code?</AlertDialogTitle>
                       <AlertDialogDescription>
