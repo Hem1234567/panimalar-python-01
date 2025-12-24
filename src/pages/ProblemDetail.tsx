@@ -17,10 +17,22 @@ import {
   AlertCircle,
   Save,
   RotateCcw,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -187,6 +199,66 @@ const ProblemDetail = () => {
       setValidationError(null);
       toast.success("Code reset to default template");
     }
+  };
+
+  // Simple Python code formatter
+  const formatPythonCode = () => {
+    const lines = code.split("\n");
+    const formattedLines: string[] = [];
+    let indentLevel = 0;
+    const indentSize = 4;
+
+    for (let line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines
+      if (trimmedLine === "") {
+        formattedLines.push("");
+        continue;
+      }
+
+      // Decrease indent for these keywords at the start
+      if (/^(elif|else|except|finally)\b/.test(trimmedLine)) {
+        indentLevel = Math.max(0, indentLevel - 1);
+      }
+
+      // Add proper indentation
+      const indent = " ".repeat(indentLevel * indentSize);
+      let formattedLine = indent + trimmedLine;
+
+      // Fix spacing around operators
+      formattedLine = formattedLine
+        .replace(/\s*=\s*/g, " = ")
+        .replace(/\s*==\s*/g, " == ")
+        .replace(/\s*!=\s*/g, " != ")
+        .replace(/\s*<=\s*/g, " <= ")
+        .replace(/\s*>=\s*/g, " >= ")
+        .replace(/\s*\+=\s*/g, " += ")
+        .replace(/\s*-=\s*/g, " -= ")
+        .replace(/,\s*/g, ", ")
+        .replace(/\s+,/g, ",");
+
+      // Fix multiple spaces (except in strings and at line start)
+      const leadingSpaces = formattedLine.match(/^\s*/)?.[0] || "";
+      const restOfLine = formattedLine.slice(leadingSpaces.length);
+      formattedLine = leadingSpaces + restOfLine.replace(/  +/g, " ");
+
+      formattedLines.push(formattedLine);
+
+      // Increase indent after colons (for blocks)
+      if (trimmedLine.endsWith(":")) {
+        indentLevel++;
+      }
+
+      // Handle return/break/continue/pass - might decrease indent on next non-empty line
+      if (/^(return|break|continue|pass)\b/.test(trimmedLine) && !trimmedLine.endsWith(":")) {
+        // Don't automatically decrease, let the next block keyword handle it
+      }
+    }
+
+    const formatted = formattedLines.join("\n");
+    setCode(formatted);
+    toast.success("Code formatted");
   };
 
   useEffect(() => {
@@ -696,12 +768,38 @@ const ProblemDetail = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleResetCode}
-                  className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={formatPythonCode}
+                  className="h-7 text-xs text-muted-foreground hover:text-primary"
                 >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Reset
+                  <Wand2 className="h-3 w-3 mr-1" />
+                  Format
                 </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Reset code?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will delete your saved code and restore the default template. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleResetCode} className="bg-destructive hover:bg-destructive/90">
+                        Reset Code
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
 
