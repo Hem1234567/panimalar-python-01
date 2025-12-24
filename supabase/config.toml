@@ -1,1 +1,7 @@
 project_id = "cfcsbyiirfxebfmxhyjh"
+
+[functions.python-judge]
+verify_jwt = false
+
+[functions.rate-limiter]
+verify_jwt = false
