@@ -18,6 +18,9 @@ import {
   Save,
   RotateCcw,
   Wand2,
+  Copy,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -121,6 +124,7 @@ const ProblemDetail = () => {
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [editorTheme, setEditorTheme] = useState<"vs-dark" | "light">("vs-dark");
 
   // Load saved code from localStorage
   useEffect(() => {
@@ -768,6 +772,31 @@ const ProblemDetail = () => {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(code);
+                    toast.success("Code copied to clipboard");
+                  }}
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Copy className="h-3 w-3 mr-1" />
+                  Copy
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditorTheme(editorTheme === "vs-dark" ? "light" : "vs-dark")}
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {editorTheme === "vs-dark" ? (
+                    <Sun className="h-3 w-3 mr-1" />
+                  ) : (
+                    <Moon className="h-3 w-3 mr-1" />
+                  )}
+                  {editorTheme === "vs-dark" ? "Light" : "Dark"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={formatPythonCode}
                   className="h-7 text-xs text-muted-foreground hover:text-primary"
                 >
@@ -807,7 +836,7 @@ const ProblemDetail = () => {
               <Editor
                 height="100%"
                 defaultLanguage="python"
-                theme="vs-dark"
+                theme={editorTheme}
                 value={code}
                 onMount={handleEditorMount}
                 onChange={(value) => {
