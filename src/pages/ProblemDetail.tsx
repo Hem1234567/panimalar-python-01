@@ -922,7 +922,7 @@ const ProblemDetail = () => {
                   fontSize: settings.fontSize,
                   fontFamily: "JetBrains Mono, monospace",
                   minimap: { enabled: false },
-                  padding: { top: 16 },
+                  padding: { top: 24 },
                   lineNumbers: settings.showLineNumbers ? "on" : "off",
                   scrollBeyondLastLine: false,
                   wordWrap: settings.wordWrap ? "on" : "off",
