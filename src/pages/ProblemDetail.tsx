@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import Editor from "@monaco-editor/react";
+import Editor, { OnMount } from "@monaco-editor/react";
+import { editor, MarkerSeverity } from "monaco-editor";
 import {
   ArrowLeft,
   Play,
@@ -14,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,10 +70,30 @@ def solve():
 solve()
 `;
 
+// Common Python error patterns for highlighting
+const pythonErrorPatterns = [
+  { regex: /\bprint\s+[^(]/, message: "Missing parentheses in print. Use print()" },
+  { regex: /\bindent(?:ation)?error/i, message: "Indentation error detected" },
+  { regex: /=\s*=/, message: "Use '==' for comparison, not '= ='" },
+  { regex: /def\s+\w+[^(]/, message: "Function definition missing parentheses" },
+  { regex: /\bif\s+[^:]+[^:]$/, message: "Missing colon after if statement" },
+  { regex: /\bfor\s+[^:]+[^:]$/, message: "Missing colon after for statement" },
+  { regex: /\bwhile\s+[^:]+[^:]$/, message: "Missing colon after while statement" },
+  { regex: /\belif\s+[^:]+[^:]$/, message: "Missing colon after elif statement" },
+  { regex: /\belse[^:]$/, message: "Missing colon after else" },
+  { regex: /\bimport\s+os\b/, message: "Warning: 'os' module may be blocked" },
+  { regex: /\bimport\s+subprocess\b/, message: "Warning: 'subprocess' module is blocked" },
+  { regex: /\bopen\s*\(/, message: "Warning: File operations may be blocked" },
+];
+
+const getStorageKey = (problemId: string) => `pychef_code_${problemId}`;
+
 const ProblemDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
   
   const [problem, setProblem] = useState<Problem | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -85,6 +107,68 @@ const ProblemDetail = () => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(true);
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Load saved code from localStorage
+  useEffect(() => {
+    if (id) {
+      const savedCode = localStorage.getItem(getStorageKey(id));
+      if (savedCode) {
+        setCode(savedCode);
+        setLastSaved(new Date());
+      }
+    }
+  }, [id]);
+
+  // Auto-save code to localStorage with debounce
+  useEffect(() => {
+    if (!id) return;
+    
+    const timeoutId = setTimeout(() => {
+      if (code && code !== defaultCode) {
+        localStorage.setItem(getStorageKey(id), code);
+        setLastSaved(new Date());
+      }
+    }, 1000); // Save after 1 second of inactivity
+
+    return () => clearTimeout(timeoutId);
+  }, [code, id]);
+
+  // Check for Python errors and add markers
+  const checkPythonErrors = useCallback((codeText: string) => {
+    if (!monacoRef.current || !editorRef.current) return;
+    
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    const markers: editor.IMarkerData[] = [];
+    const lines = codeText.split("\n");
+
+    lines.forEach((line, index) => {
+      pythonErrorPatterns.forEach((pattern) => {
+        if (pattern.regex.test(line)) {
+          markers.push({
+            severity: pattern.message.startsWith("Warning") 
+              ? monacoRef.current!.MarkerSeverity.Warning 
+              : monacoRef.current!.MarkerSeverity.Error,
+            startLineNumber: index + 1,
+            startColumn: 1,
+            endLineNumber: index + 1,
+            endColumn: line.length + 1,
+            message: pattern.message,
+          });
+        }
+      });
+    });
+
+    monacoRef.current.editor.setModelMarkers(model, "python-checker", markers);
+  }, []);
+
+  const handleEditorMount: OnMount = (editorInstance, monaco) => {
+    editorRef.current = editorInstance;
+    monacoRef.current = { editor: monaco.editor, MarkerSeverity: monaco.MarkerSeverity };
+    checkPythonErrors(code);
+  };
 
   useEffect(() => {
     if (id) {
@@ -574,10 +658,16 @@ const ProblemDetail = () => {
             animate={{ opacity: 1, x: 0 }}
             className="flex-1 flex flex-col min-h-[400px] lg:min-h-0"
           >
-            <div className="h-10 border-b border-border bg-secondary/50 flex items-center px-4">
+            <div className="h-10 border-b border-border bg-secondary/50 flex items-center px-4 justify-between">
               <span className="text-sm text-muted-foreground font-mono">
                 solution.py
               </span>
+              {lastSaved && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Save className="h-3 w-3" />
+                  <span>Saved {lastSaved.toLocaleTimeString()}</span>
+                </div>
+              )}
             </div>
 
             <div className="flex-1">
@@ -586,9 +676,12 @@ const ProblemDetail = () => {
                 defaultLanguage="python"
                 theme="vs-dark"
                 value={code}
+                onMount={handleEditorMount}
                 onChange={(value) => {
-                  setCode(value || "");
+                  const newCode = value || "";
+                  setCode(newCode);
                   if (validationError) setValidationError(null);
+                  checkPythonErrors(newCode);
                 }}
                 options={{
                   fontSize: 14,
@@ -599,6 +692,7 @@ const ProblemDetail = () => {
                   scrollBeyondLastLine: false,
                   wordWrap: "on",
                   automaticLayout: true,
+                  glyphMargin: true,
                 }}
               />
             </div>
