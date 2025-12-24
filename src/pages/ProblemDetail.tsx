@@ -15,14 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
-  Save,
-  RotateCcw,
-  Wand2,
-  Copy,
-  Sun,
-  Moon,
-  Maximize2,
-  Minimize2,
   Terminal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,10 +37,8 @@ import { toast } from "sonner";
 import FloatingActionButtons from "@/components/mobile/FloatingActionButtons";
 import MobileViewToggle from "@/components/mobile/MobileViewToggle";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
-import KeyboardShortcutsDialog from "@/components/editor/KeyboardShortcutsDialog";
-import CodeHistoryPanel from "@/components/editor/CodeHistoryPanel";
 import HintsPanel from "@/components/editor/HintsPanel";
-import CodeTemplatesPanel from "@/components/editor/CodeTemplatesPanel";
+import EditorToolbar from "@/components/editor/EditorToolbar";
 import AchievementsPanel from "@/components/achievements/AchievementsPanel";
 import DifficultyVoting from "@/components/social/DifficultyVoting";
 import Comments from "@/components/social/Comments";
@@ -810,100 +800,22 @@ const ProblemDetail = () => {
                 : "md:flex-1 md:min-h-0"
             } ${mobileView === "editor" ? "flex flex-1 h-full overflow-hidden" : "hidden md:flex"}`}
           >
-            <div className="h-auto min-h-10 border-b border-border bg-secondary/50 flex flex-wrap items-center px-2 sm:px-4 py-2 gap-2 justify-between">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <span className="text-xs sm:text-sm text-muted-foreground font-mono">
-                  solution.py
-                </span>
-                <span className="text-xs text-muted-foreground hidden lg:inline">
-                  Ctrl+Enter: Run | Ctrl+Shift+Enter: Submit
-                </span>
-              </div>
-              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                {lastSaved && (
-                  <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
-                    <Save className="h-3 w-3" />
-                    <span>Saved {lastSaved.toLocaleTimeString()}</span>
-                  </div>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(code);
-                    toast.success("Code copied to clipboard");
-                  }}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Copy className="h-3 w-3 sm:mr-1" />
-                  <span className="hidden sm:inline">Copy</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditorTheme(editorTheme === "vs-dark" ? "light" : "vs-dark")}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {editorTheme === "vs-dark" ? (
-                    <Sun className="h-3 w-3 sm:mr-1" />
-                  ) : (
-                    <Moon className="h-3 w-3 sm:mr-1" />
-                  )}
-                  <span className="hidden sm:inline">{editorTheme === "vs-dark" ? "Light" : "Dark"}</span>
-                </Button>
-                <KeyboardShortcutsDialog />
-                {id && <CodeHistoryPanel problemId={id} onLoadCode={handleLoadCode} />}
-                <CodeTemplatesPanel currentCode={code} onLoadTemplate={handleLoadCode} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={formatPythonCode}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
-                >
-                  <Wand2 className="h-3 w-3 sm:mr-1" />
-                  <span className="hidden sm:inline">Format</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hidden sm:flex"
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="h-3 w-3 sm:mr-1" />
-                  ) : (
-                    <Maximize2 className="h-3 w-3 sm:mr-1" />
-                  )}
-                  <span className="hidden sm:inline">{isFullscreen ? "Exit" : "Fullscreen"}</span>
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                    >
-                      <RotateCcw className="h-3 w-3 sm:mr-1" />
-                      <span className="hidden sm:inline">Reset</span>
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Reset code?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will delete your saved code and restore the default template. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleResetCode} className="bg-destructive hover:bg-destructive/90">
-                        Reset Code
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
+            <EditorToolbar
+              code={code}
+              problemId={id}
+              editorTheme={editorTheme}
+              isFullscreen={isFullscreen}
+              isRunning={isRunning}
+              isSubmitting={isSubmitting}
+              lastSaved={lastSaved}
+              onRun={handleRun}
+              onSubmit={handleSubmit}
+              onFormat={formatPythonCode}
+              onReset={handleResetCode}
+              onToggleTheme={() => setEditorTheme(editorTheme === "vs-dark" ? "light" : "vs-dark")}
+              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+              onLoadCode={handleLoadCode}
+            />
 
             <div className="flex-1 min-h-0 pb-24 md:pb-0 relative overflow-hidden">
               <Editor
