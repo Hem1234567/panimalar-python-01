@@ -49,6 +49,8 @@ import CodeHistoryPanel from "@/components/editor/CodeHistoryPanel";
 import HintsPanel from "@/components/editor/HintsPanel";
 import CodeTemplatesPanel from "@/components/editor/CodeTemplatesPanel";
 import AchievementsPanel from "@/components/achievements/AchievementsPanel";
+import DifficultyVoting from "@/components/social/DifficultyVoting";
+import Comments from "@/components/social/Comments";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAchievements } from "@/hooks/useAchievements";
 
@@ -567,6 +569,8 @@ const ProblemDetail = () => {
           <div className="hidden md:flex items-center gap-1 sm:gap-2">
             <AchievementsPanel />
             {id && <HintsPanel problemId={id} />}
+            {id && <Comments problemId={id} />}
+            {problem && <DifficultyVoting problemId={id!} currentDifficulty={problem.difficulty} />}
             <Button
               variant="outline"
               size="sm"

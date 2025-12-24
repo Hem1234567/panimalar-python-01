@@ -18,6 +18,7 @@ import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import DailyChallengeCard from "@/components/challenges/DailyChallengeCard";
 
 interface RecentProblem {
   id: string;
@@ -230,38 +231,47 @@ const Dashboard = () => {
                 </div>
               </motion.div>
 
-              {/* Quick Actions */}
+              {/* Daily Challenge */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-card border border-border"
               >
-                <h2 className="text-base sm:text-lg font-semibold text-foreground mb-4">
-                  Quick Actions
-                </h2>
-                <div className="space-y-2 sm:space-y-3">
-                  <Link to="/problems">
-                    <Button variant="outline" className="w-full justify-start h-10 sm:h-11 text-sm">
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      Practice Problems
-                    </Button>
-                  </Link>
-                  <Link to="/leaderboard">
-                    <Button variant="outline" className="w-full justify-start h-10 sm:h-11 text-sm">
-                      <Trophy className="h-4 w-4 mr-2" />
-                      View Leaderboard
-                    </Button>
-                  </Link>
-                  <Link to="/submissions">
-                    <Button variant="outline" className="w-full justify-start h-10 sm:h-11 text-sm">
-                      <Clock className="h-4 w-4 mr-2" />
-                      My Submissions
-                    </Button>
-                  </Link>
-                </div>
+                <DailyChallengeCard />
               </motion.div>
             </div>
+
+            {/* Quick Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+              className="mt-6 sm:mt-8 p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-card border border-border"
+            >
+              <h2 className="text-base sm:text-lg font-semibold text-foreground mb-4">
+                Quick Actions
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                <Link to="/problems">
+                  <Button variant="outline" className="w-full justify-start h-10 sm:h-11 text-sm">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Practice Problems
+                  </Button>
+                </Link>
+                <Link to="/leaderboard">
+                  <Button variant="outline" className="w-full justify-start h-10 sm:h-11 text-sm">
+                    <Trophy className="h-4 w-4 mr-2" />
+                    View Leaderboard
+                  </Button>
+                </Link>
+                <Link to="/submissions">
+                  <Button variant="outline" className="w-full justify-start h-10 sm:h-11 text-sm">
+                    <Clock className="h-4 w-4 mr-2" />
+                    My Submissions
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
 
             {/* Recent Activity */}
             <motion.div
