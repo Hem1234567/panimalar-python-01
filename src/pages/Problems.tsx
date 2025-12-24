@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -16,6 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/mobile/PullToRefreshIndicator";
 
 interface Problem {
   id: string;
@@ -38,17 +40,7 @@ const Problems = () => {
   const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  useEffect(() => {
-    fetchProblems();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchUserSubmissions();
-    }
-  }, [user]);
-
-  const fetchProblems = async () => {
+  const fetchProblems = useCallback(async () => {
     const { data, error } = await supabase
       .from("problems")
       .select("id, title, difficulty, tags")
@@ -58,9 +50,9 @@ const Problems = () => {
       setProblems(data);
     }
     setIsLoading(false);
-  };
+  }, []);
 
-  const fetchUserSubmissions = async () => {
+  const fetchUserSubmissions = useCallback(async () => {
     if (!user) return;
 
     const { data } = await supabase
@@ -78,7 +70,25 @@ const Problems = () => {
       });
       setUserSubmissions(submissionMap);
     }
-  };
+  }, [user]);
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([fetchProblems(), fetchUserSubmissions()]);
+  }, [fetchProblems, fetchUserSubmissions]);
+
+  const { containerRef, pullDistance, isRefreshing, handlers } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
+
+  useEffect(() => {
+    fetchProblems();
+  }, [fetchProblems]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserSubmissions();
+    }
+  }, [user, fetchUserSubmissions]);
 
   const getSubmissionStatus = (problemId: string) => {
     const status = userSubmissions.get(problemId);
@@ -114,7 +124,13 @@ const Problems = () => {
       <div className="min-h-screen bg-background">
         <Navbar />
 
-        <main className="pt-20 sm:pt-24 pb-16">
+        <main 
+          ref={containerRef}
+          className="pt-20 sm:pt-24 pb-16 relative overflow-auto"
+          {...handlers}
+        >
+          <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+          
           <div className="container mx-auto px-4">
             {/* Header */}
             <motion.div
@@ -334,6 +350,11 @@ const Problems = () => {
                 </div>
               )}
             </motion.div>
+
+            {/* Pull to refresh hint on mobile */}
+            <p className="text-center text-xs text-muted-foreground mt-4 md:hidden">
+              Pull down to refresh
+            </p>
           </div>
         </main>
 
