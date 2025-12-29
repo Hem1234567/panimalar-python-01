@@ -166,6 +166,30 @@ const ProblemDetail = () => {
   }, [mobileView, isFullscreen]);
 
   // Load saved code from localStorage
+  useEffect(() => {
+    if (id) {
+      const savedCode = localStorage.getItem(getStorageKey(id));
+      if (savedCode) {
+        setCode(savedCode);
+        setLastSaved(new Date());
+      }
+    }
+  }, [id]);
+
+  // Auto-save code to localStorage with debounce
+  useEffect(() => {
+    if (!id) return;
+
+    const timeoutId = window.setTimeout(() => {
+      if (code && code !== defaultCode) {
+        localStorage.setItem(getStorageKey(id), code);
+        setLastSaved(new Date());
+      }
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [code, id]);
+
   // Check for Python errors and add markers
   const checkPythonErrors = useCallback((codeText: string) => {
     if (!monacoRef.current || !editorRef.current) return;
