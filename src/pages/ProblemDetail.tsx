@@ -151,31 +151,21 @@ const ProblemDetail = () => {
     onSwipeRight: () => setMobileView("description"),
   });
 
+  // Monaco can render blank if it was mounted while hidden (common on mobile view toggles).
+  // Force a layout pass whenever the editor becomes visible.
+  useEffect(() => {
+    if (mobileView !== "editor") return;
+
+    const raf1 = requestAnimationFrame(() => editorRef.current?.layout());
+    const t1 = window.setTimeout(() => editorRef.current?.layout(), 60);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      window.clearTimeout(t1);
+    };
+  }, [mobileView, isFullscreen]);
+
   // Load saved code from localStorage
-  useEffect(() => {
-    if (id) {
-      const savedCode = localStorage.getItem(getStorageKey(id));
-      if (savedCode) {
-        setCode(savedCode);
-        setLastSaved(new Date());
-      }
-    }
-  }, [id]);
-
-  // Auto-save code to localStorage with debounce
-  useEffect(() => {
-    if (!id) return;
-    
-    const timeoutId = setTimeout(() => {
-      if (code && code !== defaultCode) {
-        localStorage.setItem(getStorageKey(id), code);
-        setLastSaved(new Date());
-      }
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
-  }, [code, id]);
-
   // Check for Python errors and add markers
   const checkPythonErrors = useCallback((codeText: string) => {
     if (!monacoRef.current || !editorRef.current) return;

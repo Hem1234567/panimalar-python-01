@@ -4,31 +4,45 @@
 }
 
 
-/* Monaco Editor - ensure the internal accessibility textarea never renders as a visible box */
-.monaco-editor textarea,
+/* Monaco Editor - prevent the internal textarea from rendering as a visible box.
+   On mobile, keep it functional (Monaco relies on it more heavily), but make it invisible.
+   On desktop, fully apply a visually-hidden pattern.
+*/
+
+/* Mobile-first: invisible but functional */
 .monaco-editor textarea.inputarea,
 .monaco-editor .inputarea {
-  /* Visually-hidden pattern (keeps it focusable/functional) */
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  min-width: 1px !important;
-  min-height: 1px !important;
-  max-width: 1px !important;
-  max-height: 1px !important;
-  margin: -1px !important;
-  padding: 0 !important;
+  opacity: 0 !important;
+  background: transparent !important;
   border: 0 !important;
   outline: 0 !important;
   box-shadow: none !important;
-  overflow: hidden !important;
-  resize: none !important;
-  clip: rect(0 0 0 0) !important;
-  clip-path: inset(50%) !important;
-  white-space: nowrap !important;
-  opacity: 0 !important;
-  background: transparent !important;
-  color: transparent !important;
-  caret-color: transparent !important;
+}
+
+/* Desktop: fully visually-hidden (keeps focus/IME working) */
+@media (min-width: 768px) {
+  .monaco-editor textarea,
+  .monaco-editor textarea.inputarea,
+  .monaco-editor .inputarea {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    min-width: 1px !important;
+    min-height: 1px !important;
+    max-width: 1px !important;
+    max-height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    resize: none !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    opacity: 0 !important;
+    background: transparent !important;
+  }
 }
 
