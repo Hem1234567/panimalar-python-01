@@ -11,6 +11,7 @@
 
 /* Mobile-first: invisible but functional */
 .monaco-editor textarea,
+textarea.inputarea,
 .monaco-editor textarea.inputarea,
 .monaco-editor .inputarea {
   /* Mobile-safe: don't fight Monaco positioning; just make it invisible */
@@ -26,6 +27,7 @@
 /* Desktop: fully visually-hidden (keeps focus/IME working) */
 @media (min-width: 768px) {
   .monaco-editor textarea,
+  textarea.inputarea,
   .monaco-editor textarea.inputarea,
   .monaco-editor .inputarea {
     position: absolute !important;
