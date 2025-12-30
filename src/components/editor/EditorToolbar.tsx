@@ -33,6 +33,8 @@ import {
 import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
 import CodeHistoryPanel from "./CodeHistoryPanel";
 import CodeTemplatesPanel from "./CodeTemplatesPanel";
+import EditorSettingsPanel from "./EditorSettingsPanel";
+import { EditorSettings } from "@/hooks/useEditorSettings";
 import { toast } from "sonner";
 
 interface EditorToolbarProps {
@@ -50,6 +52,7 @@ interface EditorToolbarProps {
   onToggleTheme: () => void;
   onToggleFullscreen: () => void;
   onLoadCode: (code: string) => void;
+  onSettingsChange?: (settings: EditorSettings) => void;
 }
 
 const EditorToolbar = memo(({
@@ -67,6 +70,7 @@ const EditorToolbar = memo(({
   onToggleTheme,
   onToggleFullscreen,
   onLoadCode,
+  onSettingsChange,
 }: EditorToolbarProps) => {
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -178,6 +182,7 @@ const EditorToolbar = memo(({
           </Tooltip>
 
           <div className="hidden md:flex items-center">
+            <EditorSettingsPanel onSettingsChange={onSettingsChange} />
             <KeyboardShortcutsDialog />
             {problemId && (
               <CodeHistoryPanel problemId={problemId} onLoadCode={onLoadCode} />
