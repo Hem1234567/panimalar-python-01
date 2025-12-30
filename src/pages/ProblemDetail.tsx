@@ -43,6 +43,7 @@ import AchievementsPanel from "@/components/achievements/AchievementsPanel";
 import DifficultyVoting from "@/components/social/DifficultyVoting";
 import Comments from "@/components/social/Comments";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useEditorSettings, EditorSettings } from "@/hooks/useEditorSettings";
 import { useAchievements } from "@/hooks/useAchievements";
 
 interface Sample {
@@ -114,6 +115,7 @@ const ProblemDetail = () => {
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
   const { settings } = useSettings();
+  const { settings: editorSettings, updateSettings: updateEditorSettings } = useEditorSettings();
   const { checkSubmissionAchievements } = useAchievements();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
@@ -131,9 +133,13 @@ const ProblemDetail = () => {
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [editorTheme, setEditorTheme] = useState(settings.editorTheme);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<"description" | "editor" | "output">("description");
+
+  // Handler for settings changes from the panel
+  const handleSettingsChange = (newSettings: EditorSettings) => {
+    updateEditorSettings(newSettings);
+  };
 
   // Handle loading code from history
   const handleLoadCode = (historyCode: string) => {
@@ -817,7 +823,7 @@ const ProblemDetail = () => {
             <EditorToolbar
               code={code}
               problemId={id}
-              editorTheme={editorTheme}
+              editorTheme={editorSettings.editor_theme}
               isFullscreen={isFullscreen}
               isRunning={isRunning}
               isSubmitting={isSubmitting}
@@ -826,16 +832,17 @@ const ProblemDetail = () => {
               onSubmit={handleSubmit}
               onFormat={formatPythonCode}
               onReset={handleResetCode}
-              onToggleTheme={() => setEditorTheme(editorTheme === "vs-dark" ? "light" : "vs-dark")}
+              onToggleTheme={() => updateEditorSettings({ editor_theme: editorSettings.editor_theme === "vs-dark" ? "light" : "vs-dark" })}
               onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
               onLoadCode={handleLoadCode}
+              onSettingsChange={handleSettingsChange}
             />
 
             <div className="flex-1 min-h-0 pb-24 md:pb-0 relative overflow-hidden">
               <Editor
                 height="100%"
                 defaultLanguage="python"
-                theme={editorTheme}
+                theme={editorSettings.editor_theme}
                 value={code}
                 onMount={handleEditorMount}
                 onChange={(value) => {
@@ -845,13 +852,13 @@ const ProblemDetail = () => {
                   checkPythonErrors(newCode);
                 }}
                 options={{
-                  fontSize: settings.fontSize,
+                  fontSize: editorSettings.font_size,
                   fontFamily: "JetBrains Mono, monospace",
                   minimap: { enabled: false },
                   padding: { top: 24 },
-                  lineNumbers: settings.showLineNumbers ? "on" : "off",
+                  lineNumbers: editorSettings.show_line_numbers ? "on" : "off",
                   scrollBeyondLastLine: false,
-                  wordWrap: settings.wordWrap ? "on" : "off",
+                  wordWrap: editorSettings.word_wrap ? "on" : "off",
                   automaticLayout: true,
                   glyphMargin: true,
                 }}

@@ -531,6 +531,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          auto_save: boolean
+          created_at: string
+          editor_theme: string
+          font_size: number
+          id: string
+          show_line_numbers: boolean
+          updated_at: string
+          user_id: string
+          vim_mode: boolean
+          word_wrap: boolean
+        }
+        Insert: {
+          auto_save?: boolean
+          created_at?: string
+          editor_theme?: string
+          font_size?: number
+          id?: string
+          show_line_numbers?: boolean
+          updated_at?: string
+          user_id: string
+          vim_mode?: boolean
+          word_wrap?: boolean
+        }
+        Update: {
+          auto_save?: boolean
+          created_at?: string
+          editor_theme?: string
+          font_size?: number
+          id?: string
+          show_line_numbers?: boolean
+          updated_at?: string
+          user_id?: string
+          vim_mode?: boolean
+          word_wrap?: boolean
+        }
+        Relationships: []
+      }
       user_templates: {
         Row: {
           code: string
