@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Code2, Menu, X, Trophy, BookOpen, User, LogOut, Shield } from "lucide-react";
+import { Code2, Menu, X, Trophy, BookOpen, User, LogOut, Shield, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ThemeToggle from "@/components/ui/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -66,14 +67,20 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* Auth Buttons */}
+          {/* Auth Buttons & Theme Toggle */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             {isAuthenticated ? (
               <>
                 <Link to="/profile">
                   <Button variant="ghost" size="sm">
                     <User className="h-4 w-4 mr-2" />
                     {profile?.name?.split(" ")[0] || "Profile"}
+                  </Button>
+                </Link>
+                <Link to="/settings">
+                  <Button variant="ghost" size="sm">
+                    <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -97,17 +104,20 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-secondary transition-colors"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6 text-foreground" />
-            ) : (
-              <Menu className="h-6 w-6 text-foreground" />
-            )}
-          </button>
+          {/* Mobile: Theme Toggle & Menu Button */}
+          <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6 text-foreground" />
+              ) : (
+                <Menu className="h-6 w-6 text-foreground" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
@@ -136,7 +146,7 @@ const Navbar = () => {
               ))}
               <div className="h-px bg-border my-2" />
               {isAuthenticated ? (
-                <>
+              <>
                   <Link
                     to="/profile"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -144,6 +154,14 @@ const Navbar = () => {
                   >
                     <User className="h-5 w-5" />
                     Profile
+                  </Link>
+                  <Link
+                    to="/settings"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  >
+                    <Settings className="h-5 w-5" />
+                    Settings
                   </Link>
                   <button
                     onClick={() => {

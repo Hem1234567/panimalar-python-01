@@ -1,9 +1,81 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins for CORS - restrict to app domains
+const ALLOWED_ORIGINS = [
+  "https://lovableproject.com",
+  "https://lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  // Check if origin is allowed
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovableproject.com') || origin.endsWith('.lovable.app')
+  ) ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
+
+// Rate limiting configuration
+const RATE_LIMIT_MAX_REQUESTS = 10; // Maximum 10 submissions per window
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
+
+// In-memory rate limit store (resets on cold start, but provides protection during hot instances)
+const rateLimitStore = new Map<string, { count: number; resetTime: number; lastFailedAt?: number }>();
+
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetIn: number;
+}
+
+function checkRateLimit(userId: string): RateLimitResult {
+  const now = Date.now();
+  const record = rateLimitStore.get(userId);
+
+  // Cleanup old entries periodically (simple memory management)
+  if (rateLimitStore.size > 1000) {
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (now > value.resetTime) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }
+
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetIn: RATE_LIMIT_WINDOW_MS };
+  }
+
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0, resetIn: record.resetTime - now };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - record.count, resetIn: record.resetTime - now };
+}
+
+// Track failed submissions for cooldown (prevent rapid retry abuse)
+function recordFailedSubmission(userId: string): void {
+  const record = rateLimitStore.get(userId);
+  if (record) {
+    record.lastFailedAt = Date.now();
+  }
+}
+
+function isInCooldown(userId: string): boolean {
+  const record = rateLimitStore.get(userId);
+  if (!record?.lastFailedAt) return false;
+  
+  // 5 second cooldown after failed submission
+  const COOLDOWN_MS = 5000;
+  return Date.now() - record.lastFailedAt < COOLDOWN_MS;
+}
 
 interface TestCase {
   input: string;
@@ -167,6 +239,9 @@ function simulateExecution(code: string, input: string): string {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -182,9 +257,53 @@ Deno.serve(async (req) => {
     
     console.log(`Judge request for problem: ${problem_id}, user: ${user_id}, run_only: ${run_only}`);
     
+    // Rate limiting check - apply to all requests
+    const rateLimit = checkRateLimit(user_id);
+    
+    if (!rateLimit.allowed) {
+      console.log(`Rate limit exceeded for user: ${user_id}`);
+      return new Response(
+        JSON.stringify({
+          status: "Rate Limited",
+          output: `Too many submissions. Please wait ${Math.ceil(rateLimit.resetIn / 1000)} seconds before trying again.`,
+          execution_time: 0,
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Retry-After": Math.ceil(rateLimit.resetIn / 1000).toString(),
+            "X-RateLimit-Remaining": "0",
+          },
+          status: 429,
+        }
+      );
+    }
+    
+    // Check cooldown after failed submission
+    if (isInCooldown(user_id)) {
+      console.log(`Cooldown active for user: ${user_id}`);
+      return new Response(
+        JSON.stringify({
+          status: "Rate Limited",
+          output: "Please wait a few seconds before retrying after a failed submission.",
+          execution_time: 0,
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Retry-After": "5",
+          },
+          status: 429,
+        }
+      );
+    }
+    
     // Validate code for security
     const validation = validateCode(code);
     if (!validation.valid) {
+      recordFailedSubmission(user_id); // Track failed attempt
       return new Response(
         JSON.stringify({
           status: "Compilation Error",
@@ -318,6 +437,8 @@ Deno.serve(async (req) => {
     
   } catch (error) {
     console.error("Judge error:", error);
+    const origin = req.headers.get("origin");
+    const corsHeaders = getCorsHeaders(origin);
     return new Response(
       JSON.stringify({ 
         status: "Error", 
