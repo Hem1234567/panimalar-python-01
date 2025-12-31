@@ -20,8 +20,6 @@ textarea.inputarea,
   border: 0 !important;
   outline: 0 !important;
   box-shadow: none !important;
-  color: transparent !important;
-  caret-color: transparent !important;
 }
 
 /* Desktop: fully visually-hidden (keeps focus/IME working) */

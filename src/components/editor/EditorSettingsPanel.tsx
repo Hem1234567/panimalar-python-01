@@ -42,13 +42,14 @@ const EditorSettingsPanel = memo(({ onSettingsChange }: EditorSettingsPanelProps
     key: K,
     value: EditorSettings[K]
   ) => {
+    const next = { ...settings, [key]: value };
     await updateSettings({ [key]: value });
-    onSettingsChange?.({ ...settings, [key]: value });
+    onSettingsChange?.(next);
   };
 
   const handleReset = async () => {
-    await resetSettings();
-    onSettingsChange?.(settings);
+    const next = await resetSettings();
+    onSettingsChange?.(next);
     toast.success("Editor settings reset to defaults");
   };
 

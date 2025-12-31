@@ -119,6 +119,8 @@ const ProblemDetail = () => {
   const { checkSubmissionAchievements } = useAchievements();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
+  const vimModeRef = useRef<{ dispose: () => void } | null>(null);
+  const vimShortcutGuardRef = useRef<editor.IDisposable | null>(null);
   
   const [problem, setProblem] = useState<Problem | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -144,7 +146,7 @@ const ProblemDetail = () => {
   // Handle loading code from history
   const handleLoadCode = (historyCode: string) => {
     setCode(historyCode);
-    if (id) {
+    if (id && editorSettings.auto_save) {
       localStorage.setItem(getStorageKey(id), historyCode);
       setLastSaved(new Date());
     }
@@ -171,6 +173,45 @@ const ProblemDetail = () => {
     };
   }, [mobileView, isFullscreen]);
 
+  // Toggle Vim keybindings when enabled/disabled
+  useEffect(() => {
+    const editorInstance = editorRef.current;
+    if (!editorInstance) return;
+
+    let cancelled = false;
+
+    const apply = async () => {
+      vimModeRef.current?.dispose();
+      vimModeRef.current = null;
+
+      if (!editorSettings.vim_mode) return;
+
+      const { initVimMode } = await import("monaco-vim");
+      if (cancelled) return;
+
+      // Status node is optional (we don't render it yet)
+      const statusNode = document.createElement("div");
+      vimModeRef.current = initVimMode(editorInstance, statusNode);
+    };
+
+    void apply();
+
+    return () => {
+      cancelled = true;
+      vimModeRef.current?.dispose();
+      vimModeRef.current = null;
+    };
+  }, [editorSettings.vim_mode]);
+
+  useEffect(() => {
+    return () => {
+      vimShortcutGuardRef.current?.dispose();
+      vimShortcutGuardRef.current = null;
+      vimModeRef.current?.dispose();
+      vimModeRef.current = null;
+    };
+  }, []);
+
   // Load saved code from localStorage
   useEffect(() => {
     if (id) {
@@ -184,7 +225,7 @@ const ProblemDetail = () => {
 
   // Auto-save code to localStorage with debounce
   useEffect(() => {
-    if (!id) return;
+    if (!id || !editorSettings.auto_save) return;
 
     const timeoutId = window.setTimeout(() => {
       if (code && code !== defaultCode) {
@@ -194,12 +235,12 @@ const ProblemDetail = () => {
     }, 1000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [code, id]);
+  }, [code, id, editorSettings.auto_save]);
 
   // Check for Python errors and add markers
   const checkPythonErrors = useCallback((codeText: string) => {
     if (!monacoRef.current || !editorRef.current) return;
-    
+
     const model = editorRef.current.getModel();
     if (!model) return;
 
@@ -210,8 +251,8 @@ const ProblemDetail = () => {
       pythonErrorPatterns.forEach((pattern) => {
         if (pattern.regex.test(line)) {
           markers.push({
-            severity: pattern.message.startsWith("Warning") 
-              ? monacoRef.current!.MarkerSeverity.Warning 
+            severity: pattern.message.startsWith("Warning")
+              ? monacoRef.current!.MarkerSeverity.Warning
               : monacoRef.current!.MarkerSeverity.Error,
             startLineNumber: index + 1,
             startColumn: 1,
@@ -231,12 +272,18 @@ const ProblemDetail = () => {
     monacoRef.current = { editor: monaco.editor, MarkerSeverity: monaco.MarkerSeverity };
     checkPythonErrors(code);
 
-    // Add keyboard shortcuts
-    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      handleRun();
-    });
-    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
-      handleSubmit();
+    // Keep Run/Submit shortcuts working even when Vim mode is enabled.
+    vimShortcutGuardRef.current?.dispose();
+    vimShortcutGuardRef.current = editorInstance.onKeyDown((e) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!isCmdOrCtrl) return;
+
+      if (e.keyCode === monaco.KeyCode.Enter) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) handleSubmit();
+        else handleRun();
+      }
     });
   };
 
