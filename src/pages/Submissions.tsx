@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, Loader2, Clock, ChevronRight } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Clock } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,21 +54,6 @@ const Submissions = () => {
     setIsLoading(false);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -85,20 +70,19 @@ const Submissions = () => {
       </Helmet>
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="pt-20 sm:pt-24 pb-16">
+        <main className="pt-24 pb-16">
           <div className="container mx-auto px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 sm:mb-8"
+              className="mb-8"
             >
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">My Submissions</h1>
-              <p className="text-sm sm:text-base text-muted-foreground">Track all your code submissions</p>
+              <h1 className="text-3xl font-bold text-foreground mb-2">My Submissions</h1>
+              <p className="text-muted-foreground">Track all your code submissions</p>
             </motion.div>
 
-            <div className="rounded-xl sm:rounded-2xl bg-card border border-border overflow-hidden">
-              {/* Desktop Table Header */}
-              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-secondary/50 border-b border-border text-sm font-medium text-muted-foreground">
+            <div className="rounded-2xl bg-card border border-border overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-secondary/50 border-b border-border text-sm font-medium text-muted-foreground">
                 <div className="col-span-1">Status</div>
                 <div className="col-span-4">Problem</div>
                 <div className="col-span-2">Difficulty</div>
@@ -121,93 +105,42 @@ const Submissions = () => {
                   >
                     <Link
                       to={`/problems/${sub.problem_id}`}
-                      className="block border-b border-border last:border-0 hover:bg-secondary/30"
+                      className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-border last:border-0 hover:bg-secondary/30 items-center"
                     >
-                      {/* Desktop View */}
-                      <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 items-center">
-                        <div className="col-span-1">
-                          {sub.status === "Accepted" ? (
-                            <CheckCircle2 className="h-5 w-5 text-accent" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-destructive" />
-                          )}
-                        </div>
-                        <div className="col-span-4 font-medium text-foreground truncate">
-                          {sub.problems?.title || "Unknown Problem"}
-                        </div>
-                        <div className="col-span-2">
-                          <span
-                            className={`text-sm font-medium ${
-                              sub.problems?.difficulty === "Easy"
-                                ? "difficulty-easy"
-                                : sub.problems?.difficulty === "Medium"
-                                ? "difficulty-medium"
-                                : "difficulty-hard"
-                            }`}
-                          >
-                            {sub.problems?.difficulty || "-"}
-                          </span>
-                        </div>
-                        <div className="col-span-2">
-                          <span
-                            className={`text-sm font-medium ${
-                              sub.status === "Accepted" ? "text-accent" : "text-destructive"
-                            }`}
-                          >
-                            {sub.status}
-                          </span>
-                        </div>
-                        <div className="col-span-3 text-sm text-muted-foreground">
-                          {new Date(sub.created_at).toLocaleString()}
-                        </div>
+                      <div className="col-span-1">
+                        {sub.status === "Accepted" ? (
+                          <CheckCircle2 className="h-5 w-5 text-accent" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-destructive" />
+                        )}
                       </div>
-
-                      {/* Mobile View */}
-                      <div className="md:hidden px-4 py-4">
-                        <div className="flex items-start gap-3">
-                          <div className="shrink-0 mt-0.5">
-                            {sub.status === "Accepted" ? (
-                              <CheckCircle2 className="h-5 w-5 text-accent" />
-                            ) : (
-                              <XCircle className="h-5 w-5 text-destructive" />
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <span className="font-medium text-foreground text-sm truncate">
-                                {sub.problems?.title || "Unknown Problem"}
-                              </span>
-                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                            </div>
-                            
-                            <div className="flex items-center gap-2 flex-wrap text-xs">
-                              <span
-                                className={`font-medium ${
-                                  sub.status === "Accepted" ? "text-accent" : "text-destructive"
-                                }`}
-                              >
-                                {sub.status}
-                              </span>
-                              <span className="text-muted-foreground">•</span>
-                              <span
-                                className={`font-medium ${
-                                  sub.problems?.difficulty === "Easy"
-                                    ? "difficulty-easy"
-                                    : sub.problems?.difficulty === "Medium"
-                                    ? "difficulty-medium"
-                                    : "difficulty-hard"
-                                }`}
-                              >
-                                {sub.problems?.difficulty || "-"}
-                              </span>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="text-muted-foreground">
-                                {formatDate(sub.created_at)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="col-span-4 font-medium text-foreground">
+                        {sub.problems?.title || "Unknown Problem"}
+                      </div>
+                      <div className="col-span-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            sub.problems?.difficulty === "Easy"
+                              ? "difficulty-easy"
+                              : sub.problems?.difficulty === "Medium"
+                              ? "difficulty-medium"
+                              : "difficulty-hard"
+                          }`}
+                        >
+                          {sub.problems?.difficulty || "-"}
+                        </span>
+                      </div>
+                      <div className="col-span-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            sub.status === "Accepted" ? "text-accent" : "text-destructive"
+                          }`}
+                        >
+                          {sub.status}
+                        </span>
+                      </div>
+                      <div className="col-span-3 text-sm text-muted-foreground">
+                        {new Date(sub.created_at).toLocaleString()}
                       </div>
                     </Link>
                   </motion.div>

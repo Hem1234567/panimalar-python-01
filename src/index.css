@@ -1,80 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* PyChef Design System - Competitive Programming Theme */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+/* PyChef Design System - Dark Competitive Programming Theme */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    --primary: 250 89% 55%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
-
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-
-    --accent: 142 71% 45%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 250 89% 55%;
-
-    --radius: 0.75rem;
-
-    /* Custom tokens */
-    --success: 142 71% 45%;
-    --warning: 38 92% 50%;
-    --error: 0 84% 60%;
-    --info: 217 91% 60%;
-    
-    /* Difficulty colors */
-    --difficulty-easy: 142 71% 40%;
-    --difficulty-medium: 38 92% 45%;
-    --difficulty-hard: 0 84% 55%;
-    
-    /* Code editor */
-    --editor-bg: 220 14% 96%;
-    --editor-line: 220 13% 91%;
-    
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(250 89% 55%) 0%, hsl(280 89% 50%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(160 71% 40%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(220 14% 98%) 0%, hsl(220 14% 96%) 100%);
-
-    /* Shadows */
-    --shadow-glow: 0 0 40px hsl(250 89% 55% / 0.1);
-    --shadow-card: 0 4px 24px hsl(222 47% 11% / 0.08);
-    --shadow-button: 0 4px 16px hsl(250 89% 55% / 0.2);
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 250 89% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 250 89% 55%;
-  }
-
-  .dark {
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;
 
@@ -102,6 +35,8 @@
     --border: 222 47% 16%;
     --input: 222 47% 14%;
     --ring: 250 89% 60%;
+
+    --radius: 0.75rem;
 
     /* Custom tokens */
     --success: 142 71% 45%;
