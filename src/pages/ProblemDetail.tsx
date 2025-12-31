@@ -6,8 +6,6 @@ import Editor, { OnMount } from "@monaco-editor/react";
 import { editor, MarkerSeverity } from "monaco-editor";
 import {
   ArrowLeft,
-  Play,
-  Send,
   Clock,
   CheckCircle2,
   XCircle,
@@ -20,17 +18,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -43,7 +30,7 @@ import AchievementsPanel from "@/components/achievements/AchievementsPanel";
 import DifficultyVoting from "@/components/social/DifficultyVoting";
 import Comments from "@/components/social/Comments";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useEditorSettings, EditorSettings } from "@/hooks/useEditorSettings";
+import { useEditorSettings } from "@/hooks/useEditorSettings";
 import { useAchievements } from "@/hooks/useAchievements";
 
 interface Sample {
@@ -138,19 +125,6 @@ const ProblemDetail = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<"description" | "editor" | "output">("description");
 
-  // Handler for settings changes from the panel
-  const handleSettingsChange = (newSettings: EditorSettings) => {
-    updateEditorSettings(newSettings);
-  };
-
-  // Handle loading code from history
-  const handleLoadCode = (historyCode: string) => {
-    setCode(historyCode);
-    if (id && editorSettings.auto_save) {
-      localStorage.setItem(getStorageKey(id), historyCode);
-      setLastSaved(new Date());
-    }
-  };
 
   // Swipe gesture for mobile view toggle
   const swipeHandlers = useSwipeGesture({
@@ -285,65 +259,6 @@ const ProblemDetail = () => {
         else handleRun();
       }
     });
-  };
-
-  const handleResetCode = () => {
-    if (id) {
-      localStorage.removeItem(getStorageKey(id));
-      setCode(defaultCode);
-      setLastSaved(null);
-      setValidationError(null);
-      toast.success("Code reset to default template");
-    }
-  };
-
-  // Simple Python code formatter
-  const formatPythonCode = () => {
-    const lines = code.split("\n");
-    const formattedLines: string[] = [];
-    let indentLevel = 0;
-    const indentSize = 4;
-
-    for (let line of lines) {
-      const trimmedLine = line.trim();
-      
-      if (trimmedLine === "") {
-        formattedLines.push("");
-        continue;
-      }
-
-      if (/^(elif|else|except|finally)\b/.test(trimmedLine)) {
-        indentLevel = Math.max(0, indentLevel - 1);
-      }
-
-      const indent = " ".repeat(indentLevel * indentSize);
-      let formattedLine = indent + trimmedLine;
-
-      formattedLine = formattedLine
-        .replace(/\s*=\s*/g, " = ")
-        .replace(/\s*==\s*/g, " == ")
-        .replace(/\s*!=\s*/g, " != ")
-        .replace(/\s*<=\s*/g, " <= ")
-        .replace(/\s*>=\s*/g, " >= ")
-        .replace(/\s*\+=\s*/g, " += ")
-        .replace(/\s*-=\s*/g, " -= ")
-        .replace(/,\s*/g, ", ")
-        .replace(/\s+,/g, ",");
-
-      const leadingSpaces = formattedLine.match(/^\s*/)?.[0] || "";
-      const restOfLine = formattedLine.slice(leadingSpaces.length);
-      formattedLine = leadingSpaces + restOfLine.replace(/  +/g, " ");
-
-      formattedLines.push(formattedLine);
-
-      if (trimmedLine.endsWith(":")) {
-        indentLevel++;
-      }
-    }
-
-    const formatted = formattedLines.join("\n");
-    setCode(formatted);
-    toast.success("Code formatted");
   };
 
   useEffect(() => {
@@ -631,40 +546,12 @@ const ProblemDetail = () => {
             </Badge>
           </div>
 
-          {/* Desktop Run/Submit buttons and features */}
+          {/* Desktop features */}
           <div className="hidden md:flex items-center gap-1 sm:gap-2">
             <AchievementsPanel />
             {id && <HintsPanel problemId={id} />}
             {id && <Comments problemId={id} />}
             {problem && <DifficultyVoting problemId={id!} currentDifficulty={problem.difficulty} />}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRun}
-              disabled={isRunning || isSubmitting}
-              className="px-2 sm:px-3"
-            >
-              {isRunning ? (
-                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-              ) : (
-                <Play className="h-4 w-4 sm:mr-2" />
-              )}
-              <span className="hidden sm:inline">Run</span>
-            </Button>
-            <Button
-              variant="hero"
-              size="sm"
-              onClick={handleSubmit}
-              disabled={isRunning || isSubmitting}
-              className="px-2 sm:px-3"
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-              ) : (
-                <Send className="h-4 w-4 sm:mr-2" />
-              )}
-              <span className="hidden sm:inline">Submit</span>
-            </Button>
           </div>
         </header>
 
@@ -867,23 +754,7 @@ const ProblemDetail = () => {
                 : "md:flex-1 md:min-h-0"
             } ${mobileView === "editor" ? "flex flex-1 h-full overflow-hidden" : "hidden md:flex"}`}
           >
-            <EditorToolbar
-              code={code}
-              problemId={id}
-              editorTheme={editorSettings.editor_theme}
-              isFullscreen={isFullscreen}
-              isRunning={isRunning}
-              isSubmitting={isSubmitting}
-              lastSaved={lastSaved}
-              onRun={handleRun}
-              onSubmit={handleSubmit}
-              onFormat={formatPythonCode}
-              onReset={handleResetCode}
-              onToggleTheme={() => updateEditorSettings({ editor_theme: editorSettings.editor_theme === "vs-dark" ? "light" : "vs-dark" })}
-              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-              onLoadCode={handleLoadCode}
-              onSettingsChange={handleSettingsChange}
-            />
+            <EditorToolbar lastSaved={lastSaved} />
 
             <div className="flex-1 min-h-0 pb-24 md:pb-0 relative overflow-hidden">
               <Editor
@@ -1074,7 +945,7 @@ const ProblemDetail = () => {
           </motion.div>
         </div>
 
-        {/* Mobile Floating Action Buttons */}
+        {/* Floating Action Buttons */}
         <FloatingActionButtons
           onRun={handleRun}
           onSubmit={handleSubmit}
