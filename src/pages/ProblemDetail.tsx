@@ -120,7 +120,7 @@ const ProblemDetail = () => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
   const vimModeRef = useRef<{ dispose: () => void } | null>(null);
-  const vimShortcutGuardRef = useRef<editor.IDisposable | null>(null);
+  const vimShortcutGuardRef = useRef<{ dispose: () => void } | null>(null);
   
   const [problem, setProblem] = useState<Problem | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
