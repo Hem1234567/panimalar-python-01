@@ -19,33 +19,32 @@ const FloatingActionButtons = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="fixed bottom-6 right-4 left-4 z-40 flex gap-3 md:hidden"
+      className="fixed bottom-6 right-6 z-40 flex gap-3"
     >
       <Button
         variant="outline"
         size="lg"
         onClick={onRun}
         disabled={isRunning || isSubmitting}
-        className="flex-1 h-14 text-base font-semibold bg-background/95 backdrop-blur-sm border-2 shadow-lg"
+        className="h-12 px-5 text-sm font-semibold bg-[#1e1e1e] hover:bg-[#2a2a2a] border-[#444] text-[#ccc] shadow-lg"
       >
         {isRunning ? (
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
         ) : (
-          <Play className="h-5 w-5 mr-2" />
+          <Play className="h-4 w-4 mr-2" />
         )}
         Run
       </Button>
       <Button
-        variant="hero"
         size="lg"
         onClick={onSubmit}
         disabled={isRunning || isSubmitting}
-        className="flex-1 h-14 text-base font-semibold shadow-lg"
+        className="h-12 px-5 text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
       >
         {isSubmitting ? (
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
         ) : (
-          <Send className="h-5 w-5 mr-2" />
+          <Send className="h-4 w-4 mr-2" />
         )}
         Submit
       </Button>

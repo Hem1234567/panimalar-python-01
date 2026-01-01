@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -11,7 +11,7 @@ export interface EditorSettings {
   auto_save: boolean;
 }
 
-const defaultSettings: EditorSettings = {
+export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   editor_theme: "vs-dark",
   font_size: 14,
   word_wrap: false,
@@ -20,25 +20,35 @@ const defaultSettings: EditorSettings = {
   auto_save: true,
 };
 
+const STORAGE_KEY = "pychef-editor-settings";
+
 export const useEditorSettings = () => {
   const { user } = useAuth();
-  const [settings, setSettings] = useState<EditorSettings>(defaultSettings);
+  const [settings, setSettings] = useState<EditorSettings>(DEFAULT_EDITOR_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch settings from database
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   useEffect(() => {
     const fetchSettings = async () => {
+      setIsLoading(true);
+
       if (!user) {
-        // Use localStorage for non-authenticated users
-        const stored = localStorage.getItem("pychef-editor-settings");
+        const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           try {
-            setSettings({ ...defaultSettings, ...JSON.parse(stored) });
+            setSettings({ ...DEFAULT_EDITOR_SETTINGS, ...JSON.parse(stored) });
           } catch {
-            setSettings(defaultSettings);
+            setSettings(DEFAULT_EDITOR_SETTINGS);
           }
+        } else {
+          setSettings(DEFAULT_EDITOR_SETTINGS);
         }
+
         setIsLoading(false);
         return;
       }
@@ -46,7 +56,7 @@ export const useEditorSettings = () => {
       try {
         const { data, error } = await supabase
           .from("user_settings")
-          .select("*")
+          .select("editor_theme, font_size, word_wrap, vim_mode, show_line_numbers, auto_save")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -61,6 +71,12 @@ export const useEditorSettings = () => {
             show_line_numbers: data.show_line_numbers,
             auto_save: data.auto_save,
           });
+        } else {
+          // Ensure a default row exists for authenticated users
+          await supabase
+            .from("user_settings")
+            .upsert({ user_id: user.id, ...DEFAULT_EDITOR_SETTINGS }, { onConflict: "user_id" });
+          setSettings(DEFAULT_EDITOR_SETTINGS);
         }
       } catch (error) {
         console.error("Error fetching editor settings:", error);
@@ -69,18 +85,13 @@ export const useEditorSettings = () => {
       }
     };
 
-    fetchSettings();
+    void fetchSettings();
   }, [user]);
 
-  // Save settings to database
-  const updateSettings = useCallback(
-    async (updates: Partial<EditorSettings>) => {
-      const newSettings = { ...settings, ...updates };
-      setSettings(newSettings);
-
+  const persistSettings = useCallback(
+    async (next: EditorSettings) => {
       if (!user) {
-        // Save to localStorage for non-authenticated users
-        localStorage.setItem("pychef-editor-settings", JSON.stringify(newSettings));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return;
       }
 
@@ -88,13 +99,7 @@ export const useEditorSettings = () => {
       try {
         const { error } = await supabase
           .from("user_settings")
-          .upsert(
-            {
-              user_id: user.id,
-              ...newSettings,
-            },
-            { onConflict: "user_id" }
-          );
+          .upsert({ user_id: user.id, ...next }, { onConflict: "user_id" });
 
         if (error) throw error;
       } catch (error) {
@@ -103,36 +108,30 @@ export const useEditorSettings = () => {
         setIsSaving(false);
       }
     },
-    [settings, user]
+    [user]
+  );
+
+  const updateSettings = useCallback(
+    async (updates: Partial<EditorSettings>) => {
+      const next = { ...settingsRef.current, ...updates };
+      setSettings(next);
+      await persistSettings(next);
+    },
+    [persistSettings]
   );
 
   const resetSettings = useCallback(async () => {
-    setSettings(defaultSettings);
+    const next = DEFAULT_EDITOR_SETTINGS;
+    setSettings(next);
 
     if (!user) {
-      localStorage.removeItem("pychef-editor-settings");
-      return;
+      localStorage.removeItem(STORAGE_KEY);
+      return next;
     }
 
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from("user_settings")
-        .upsert(
-          {
-            user_id: user.id,
-            ...defaultSettings,
-          },
-          { onConflict: "user_id" }
-        );
-
-      if (error) throw error;
-    } catch (error) {
-      console.error("Error resetting editor settings:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [user]);
+    await persistSettings(next);
+    return next;
+  }, [persistSettings, user]);
 
   return {
     settings,

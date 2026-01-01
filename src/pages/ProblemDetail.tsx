@@ -1,49 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Editor, { OnMount } from "@monaco-editor/react";
 import { editor, MarkerSeverity } from "monaco-editor";
 import {
   ArrowLeft,
-  Play,
-  Send,
   Clock,
   CheckCircle2,
   XCircle,
   Loader2,
-  ChevronDown,
-  ChevronUp,
   AlertCircle,
   Terminal,
+  Play,
+  Send,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import FloatingActionButtons from "@/components/mobile/FloatingActionButtons";
 import MobileViewToggle from "@/components/mobile/MobileViewToggle";
 import { useSwipeGesture } from "@/hooks/useSwipeGesture";
 import HintsPanel from "@/components/editor/HintsPanel";
-import EditorToolbar from "@/components/editor/EditorToolbar";
 import AchievementsPanel from "@/components/achievements/AchievementsPanel";
 import DifficultyVoting from "@/components/social/DifficultyVoting";
 import Comments from "@/components/social/Comments";
-import { useSettings } from "@/contexts/SettingsContext";
-import { useEditorSettings, EditorSettings } from "@/hooks/useEditorSettings";
+import { useEditorSettings } from "@/hooks/useEditorSettings";
 import { useAchievements } from "@/hooks/useAchievements";
 
 interface Sample {
@@ -75,10 +60,9 @@ interface Submission {
 interface ExecutionStep {
   step: string;
   status: "pending" | "running" | "done" | "error";
-  message?: string;
 }
 
-const defaultCode = `# Write your Python solution here
+const DEFAULT_CODE = `# Write your Python solution here
 
 def solve():
     # Read input
@@ -92,86 +76,87 @@ def solve():
 solve()
 `;
 
-// Common Python error patterns for highlighting
-const pythonErrorPatterns = [
-  { regex: /\bprint\s+[^(]/, message: "Missing parentheses in print. Use print()" },
-  { regex: /\bindent(?:ation)?error/i, message: "Indentation error detected" },
-  { regex: /=\s*=/, message: "Use '==' for comparison, not '= ='" },
-  { regex: /def\s+\w+[^(]/, message: "Function definition missing parentheses" },
-  { regex: /\bif\s+[^:]+[^:]$/, message: "Missing colon after if statement" },
-  { regex: /\bfor\s+[^:]+[^:]$/, message: "Missing colon after for statement" },
-  { regex: /\bwhile\s+[^:]+[^:]$/, message: "Missing colon after while statement" },
-  { regex: /\belif\s+[^:]+[^:]$/, message: "Missing colon after elif statement" },
-  { regex: /\belse[^:]$/, message: "Missing colon after else" },
-  { regex: /\bimport\s+os\b/, message: "Warning: 'os' module may be blocked" },
-  { regex: /\bimport\s+subprocess\b/, message: "Warning: 'subprocess' module is blocked" },
-  { regex: /\bopen\s*\(/, message: "Warning: File operations may be blocked" },
-];
-
 const getStorageKey = (problemId: string) => `pychef_code_${problemId}`;
 
 const ProblemDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
-  const { settings } = useSettings();
-  const { settings: editorSettings, updateSettings: updateEditorSettings } = useEditorSettings();
+  const { settings: editorSettings } = useEditorSettings();
   const { checkSubmissionAchievements } = useAchievements();
+  
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<{ editor: typeof editor; MarkerSeverity: typeof MarkerSeverity } | null>(null);
-  
+  const vimModeRef = useRef<{ dispose: () => void } | null>(null);
+
   const [problem, setProblem] = useState<Problem | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [code, setCode] = useState(defaultCode);
+  const [code, setCode] = useState(DEFAULT_CODE);
   const [activeTab, setActiveTab] = useState("description");
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [verdict, setVerdict] = useState<"success" | "error" | "info" | null>(null);
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(true);
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
-  const [validationError, setValidationError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileView, setMobileView] = useState<"description" | "editor" | "output">("description");
 
-  // Handler for settings changes from the panel
-  const handleSettingsChange = (newSettings: EditorSettings) => {
-    updateEditorSettings(newSettings);
-  };
-
-  // Handle loading code from history
-  const handleLoadCode = (historyCode: string) => {
-    setCode(historyCode);
-    if (id) {
-      localStorage.setItem(getStorageKey(id), historyCode);
-      setLastSaved(new Date());
-    }
-  };
-
-  // Swipe gesture for mobile view toggle
+  // Swipe gesture for mobile
   const swipeHandlers = useSwipeGesture({
     threshold: 75,
     onSwipeLeft: () => setMobileView("editor"),
     onSwipeRight: () => setMobileView("description"),
   });
 
-  // Monaco can render blank if it was mounted while hidden (common on mobile view toggles).
-  // Force a layout pass whenever the editor becomes visible.
+  // Force layout when editor becomes visible
   useEffect(() => {
     if (mobileView !== "editor") return;
+    const raf = requestAnimationFrame(() => editorRef.current?.layout());
+    const timeout = setTimeout(() => editorRef.current?.layout(), 60);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timeout);
+    };
+  }, [mobileView]);
 
-    const raf1 = requestAnimationFrame(() => editorRef.current?.layout());
-    const t1 = window.setTimeout(() => editorRef.current?.layout(), 60);
+  // Vim mode toggle
+  useEffect(() => {
+    const editorInstance = editorRef.current;
+    if (!editorInstance) return;
+
+    let cancelled = false;
+
+    const applyVim = async () => {
+      vimModeRef.current?.dispose();
+      vimModeRef.current = null;
+
+      if (!editorSettings.vim_mode) return;
+
+      const { initVimMode } = await import("monaco-vim");
+      if (cancelled) return;
+
+      const statusNode = document.createElement("div");
+      vimModeRef.current = initVimMode(editorInstance, statusNode);
+    };
+
+    applyVim();
 
     return () => {
-      cancelAnimationFrame(raf1);
-      window.clearTimeout(t1);
+      cancelled = true;
+      vimModeRef.current?.dispose();
+      vimModeRef.current = null;
     };
-  }, [mobileView, isFullscreen]);
+  }, [editorSettings.vim_mode]);
 
-  // Load saved code from localStorage
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      vimModeRef.current?.dispose();
+    };
+  }, []);
+
+  // Load saved code
   useEffect(() => {
     if (id) {
       const savedCode = localStorage.getItem(getStorageKey(id));
@@ -182,133 +167,28 @@ const ProblemDetail = () => {
     }
   }, [id]);
 
-  // Auto-save code to localStorage with debounce
+  // Auto-save
   useEffect(() => {
-    if (!id) return;
+    if (!id || !editorSettings.auto_save) return;
 
-    const timeoutId = window.setTimeout(() => {
-      if (code && code !== defaultCode) {
+    const timeout = setTimeout(() => {
+      if (code && code !== DEFAULT_CODE) {
         localStorage.setItem(getStorageKey(id), code);
         setLastSaved(new Date());
       }
     }, 1000);
 
-    return () => window.clearTimeout(timeoutId);
-  }, [code, id]);
+    return () => clearTimeout(timeout);
+  }, [code, id, editorSettings.auto_save]);
 
-  // Check for Python errors and add markers
-  const checkPythonErrors = useCallback((codeText: string) => {
-    if (!monacoRef.current || !editorRef.current) return;
-    
-    const model = editorRef.current.getModel();
-    if (!model) return;
-
-    const markers: editor.IMarkerData[] = [];
-    const lines = codeText.split("\n");
-
-    lines.forEach((line, index) => {
-      pythonErrorPatterns.forEach((pattern) => {
-        if (pattern.regex.test(line)) {
-          markers.push({
-            severity: pattern.message.startsWith("Warning") 
-              ? monacoRef.current!.MarkerSeverity.Warning 
-              : monacoRef.current!.MarkerSeverity.Error,
-            startLineNumber: index + 1,
-            startColumn: 1,
-            endLineNumber: index + 1,
-            endColumn: line.length + 1,
-            message: pattern.message,
-          });
-        }
-      });
-    });
-
-    monacoRef.current.editor.setModelMarkers(model, "python-checker", markers);
-  }, []);
-
-  const handleEditorMount: OnMount = (editorInstance, monaco) => {
-    editorRef.current = editorInstance;
-    monacoRef.current = { editor: monaco.editor, MarkerSeverity: monaco.MarkerSeverity };
-    checkPythonErrors(code);
-
-    // Add keyboard shortcuts
-    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      handleRun();
-    });
-    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
-      handleSubmit();
-    });
-  };
-
-  const handleResetCode = () => {
-    if (id) {
-      localStorage.removeItem(getStorageKey(id));
-      setCode(defaultCode);
-      setLastSaved(null);
-      setValidationError(null);
-      toast.success("Code reset to default template");
-    }
-  };
-
-  // Simple Python code formatter
-  const formatPythonCode = () => {
-    const lines = code.split("\n");
-    const formattedLines: string[] = [];
-    let indentLevel = 0;
-    const indentSize = 4;
-
-    for (let line of lines) {
-      const trimmedLine = line.trim();
-      
-      if (trimmedLine === "") {
-        formattedLines.push("");
-        continue;
-      }
-
-      if (/^(elif|else|except|finally)\b/.test(trimmedLine)) {
-        indentLevel = Math.max(0, indentLevel - 1);
-      }
-
-      const indent = " ".repeat(indentLevel * indentSize);
-      let formattedLine = indent + trimmedLine;
-
-      formattedLine = formattedLine
-        .replace(/\s*=\s*/g, " = ")
-        .replace(/\s*==\s*/g, " == ")
-        .replace(/\s*!=\s*/g, " != ")
-        .replace(/\s*<=\s*/g, " <= ")
-        .replace(/\s*>=\s*/g, " >= ")
-        .replace(/\s*\+=\s*/g, " += ")
-        .replace(/\s*-=\s*/g, " -= ")
-        .replace(/,\s*/g, ", ")
-        .replace(/\s+,/g, ",");
-
-      const leadingSpaces = formattedLine.match(/^\s*/)?.[0] || "";
-      const restOfLine = formattedLine.slice(leadingSpaces.length);
-      formattedLine = leadingSpaces + restOfLine.replace(/  +/g, " ");
-
-      formattedLines.push(formattedLine);
-
-      if (trimmedLine.endsWith(":")) {
-        indentLevel++;
-      }
-    }
-
-    const formatted = formattedLines.join("\n");
-    setCode(formatted);
-    toast.success("Code formatted");
-  };
-
+  // Fetch problem
   useEffect(() => {
-    if (id) {
-      fetchProblem();
-    }
+    if (id) fetchProblem();
   }, [id]);
 
+  // Fetch submissions
   useEffect(() => {
-    if (id && user) {
-      fetchSubmissions();
-    }
+    if (id && user) fetchSubmissions();
   }, [id, user]);
 
   const fetchProblem = async () => {
@@ -324,8 +204,7 @@ const ProblemDetail = () => {
       return;
     }
 
-    const samplesData = Array.isArray(data.samples) ? data.samples : [];
-    const problemData: Problem = {
+    setProblem({
       id: data.id,
       title: data.title,
       statement: data.statement,
@@ -334,11 +213,9 @@ const ProblemDetail = () => {
       input_format: data.input_format || "",
       output_format: data.output_format || "",
       constraints: data.constraints || "",
-      samples: samplesData as unknown as Sample[],
+      samples: (Array.isArray(data.samples) ? data.samples : []) as unknown as Sample[],
       time_limit: data.time_limit,
-    };
-
-    setProblem(problemData);
+    });
     setIsLoading(false);
   };
 
@@ -353,41 +230,31 @@ const ProblemDetail = () => {
       .order("created_at", { ascending: false })
       .limit(10);
 
-    if (data) {
-      setSubmissions(data);
-    }
+    if (data) setSubmissions(data);
   };
 
-  const validateCode = (): boolean => {
-    setValidationError(null);
-    
-    const trimmedCode = code.trim();
-    
-    if (!trimmedCode) {
-      setValidationError("Code cannot be empty");
-      toast.error("Please write some code before running");
-      return false;
-    }
-    
-    if (trimmedCode === defaultCode.trim()) {
-      setValidationError("Please modify the default template");
-      toast.error("Please write your solution before running");
-      return false;
-    }
-    
-    if (trimmedCode.length < 10) {
-      setValidationError("Code is too short");
-      toast.error("Code seems incomplete");
-      return false;
-    }
-    
-    return true;
+  const handleEditorMount: OnMount = (editorInstance, monaco) => {
+    editorRef.current = editorInstance;
+    monacoRef.current = { editor: monaco.editor, MarkerSeverity: monaco.MarkerSeverity };
+
+    // Keyboard shortcuts
+    editorInstance.onKeyDown((e) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!isCmdOrCtrl) return;
+
+      if (e.keyCode === monaco.KeyCode.Enter) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) handleSubmit();
+        else handleRun();
+      }
+    });
   };
 
-  const updateStep = (stepIndex: number, status: ExecutionStep["status"], message?: string) => {
-    setExecutionSteps(prev => prev.map((step, i) => 
-      i === stepIndex ? { ...step, status, message } : step
-    ));
+  const updateStep = (stepIndex: number, status: ExecutionStep["status"]) => {
+    setExecutionSteps((prev) =>
+      prev.map((step, i) => (i === stepIndex ? { ...step, status } : step))
+    );
   };
 
   const handleRun = async () => {
@@ -397,15 +264,16 @@ const ProblemDetail = () => {
       return;
     }
 
-    if (!validateCode()) return;
+    if (code.trim().length < 10) {
+      toast.error("Please write some code first");
+      return;
+    }
 
     setIsRunning(true);
     setOutput(null);
     setVerdict(null);
-    // Auto-switch to output view on mobile when running
-    if (window.innerWidth < 768) {
-      setMobileView("output");
-    }
+    if (window.innerWidth < 768) setMobileView("output");
+
     setExecutionSteps([
       { step: "Parsing code", status: "running" },
       { step: "Validating syntax", status: "pending" },
@@ -414,37 +282,34 @@ const ProblemDetail = () => {
     ]);
 
     try {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
       updateStep(0, "done");
       updateStep(1, "running");
-      
-      await new Promise(r => setTimeout(r, 300));
+
+      await new Promise((r) => setTimeout(r, 300));
       updateStep(1, "done");
       updateStep(2, "running");
 
       const { data, error } = await supabase.functions.invoke("python-judge", {
-        body: {
-          problem_id: id,
-          code,
-          user_id: user.id,
-          run_only: true,
-        },
+        body: { problem_id: id, code, user_id: user.id, run_only: true },
       });
 
       if (error) throw error;
 
       updateStep(2, "done");
       updateStep(3, "running");
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 200));
       updateStep(3, "done");
 
       setOutput(data.output);
       setVerdict(data.status === "Executed" ? "info" : "error");
     } catch (error) {
       console.error("Run error:", error);
-      setExecutionSteps(prev => prev.map(step => 
-        step.status === "running" ? { ...step, status: "error" } : step
-      ));
+      setExecutionSteps((prev) =>
+        prev.map((step) =>
+          step.status === "running" ? { ...step, status: "error" } : step
+        )
+      );
       setOutput("Failed to execute code. Please try again.");
       setVerdict("error");
     } finally {
@@ -459,15 +324,16 @@ const ProblemDetail = () => {
       return;
     }
 
-    if (!validateCode()) return;
+    if (code.trim().length < 10) {
+      toast.error("Please write some code first");
+      return;
+    }
 
     setIsSubmitting(true);
     setOutput(null);
     setVerdict(null);
-    // Auto-switch to output view on mobile when submitting
-    if (window.innerWidth < 768) {
-      setMobileView("output");
-    }
+    if (window.innerWidth < 768) setMobileView("output");
+
     setExecutionSteps([
       { step: "Parsing code", status: "running" },
       { step: "Validating syntax", status: "pending" },
@@ -477,31 +343,26 @@ const ProblemDetail = () => {
     ]);
 
     try {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
       updateStep(0, "done");
       updateStep(1, "running");
-      
-      await new Promise(r => setTimeout(r, 300));
+
+      await new Promise((r) => setTimeout(r, 300));
       updateStep(1, "done");
       updateStep(2, "running");
 
       const { data, error } = await supabase.functions.invoke("python-judge", {
-        body: {
-          problem_id: id,
-          code,
-          user_id: user.id,
-          run_only: false,
-        },
+        body: { problem_id: id, code, user_id: user.id, run_only: false },
       });
 
       if (error) throw error;
 
       updateStep(2, "done");
       updateStep(3, "running");
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 200));
       updateStep(3, "done");
       updateStep(4, "running");
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 200));
       updateStep(4, "done");
 
       setOutput(data.output);
@@ -510,24 +371,20 @@ const ProblemDetail = () => {
       if (data.status === "Accepted") {
         toast.success("🎉 Accepted! +50 XP");
         refreshProfile();
-        // Check for achievements
-        if (user) {
-          checkSubmissionAchievements(user.id, true, new Date());
-        }
+        checkSubmissionAchievements(user.id, true, new Date());
       } else {
         toast.error(data.status);
-        // Check for first submission achievement even if not accepted
-        if (user) {
-          checkSubmissionAchievements(user.id, false, new Date());
-        }
+        checkSubmissionAchievements(user.id, false, new Date());
       }
 
       fetchSubmissions();
     } catch (error) {
       console.error("Submit error:", error);
-      setExecutionSteps(prev => prev.map(step => 
-        step.status === "running" ? { ...step, status: "error" } : step
-      ));
+      setExecutionSteps((prev) =>
+        prev.map((step) =>
+          step.status === "running" ? { ...step, status: "error" } : step
+        )
+      );
       setOutput("Failed to submit code. Please try again.");
       setVerdict("error");
     } finally {
@@ -555,18 +412,18 @@ const ProblemDetail = () => {
 
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
-        <header className="h-12 sm:h-14 border-b border-border bg-card flex items-center px-2 sm:px-4 gap-2 sm:gap-4">
+        <header className="h-12 sm:h-14 border-b border-border bg-card flex items-center px-3 sm:px-4 gap-3">
           <Link
             to="/problems"
-            className="flex items-center gap-1 sm:gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Problems</span>
+            <span className="hidden sm:inline text-sm">Problems</span>
           </Link>
 
-          <div className="h-6 w-px bg-border hidden sm:block" />
+          <div className="h-5 w-px bg-border hidden sm:block" />
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <h1 className="font-semibold text-foreground truncate text-sm sm:text-base">
               {problem.title}
             </h1>
@@ -574,339 +431,319 @@ const ProblemDetail = () => {
               variant="secondary"
               className={`text-xs shrink-0 ${
                 problem.difficulty === "Easy"
-                  ? "bg-difficulty-easy/20 text-difficulty-easy"
+                  ? "bg-green-500/20 text-green-400"
                   : problem.difficulty === "Medium"
-                  ? "bg-difficulty-medium/20 text-difficulty-medium"
-                  : "bg-difficulty-hard/20 text-difficulty-hard"
+                  ? "bg-yellow-500/20 text-yellow-400"
+                  : "bg-red-500/20 text-red-400"
               }`}
             >
               {problem.difficulty}
             </Badge>
           </div>
 
-          {/* Desktop Run/Submit buttons and features */}
-          <div className="hidden md:flex items-center gap-1 sm:gap-2">
+          {/* Desktop features */}
+          <div className="hidden md:flex items-center gap-2">
             <AchievementsPanel />
             {id && <HintsPanel problemId={id} />}
             {id && <Comments problemId={id} />}
-            {problem && <DifficultyVoting problemId={id!} currentDifficulty={problem.difficulty} />}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRun}
-              disabled={isRunning || isSubmitting}
-              className="px-2 sm:px-3"
-            >
-              {isRunning ? (
-                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-              ) : (
-                <Play className="h-4 w-4 sm:mr-2" />
-              )}
-              <span className="hidden sm:inline">Run</span>
-            </Button>
-            <Button
-              variant="hero"
-              size="sm"
-              onClick={handleSubmit}
-              disabled={isRunning || isSubmitting}
-              className="px-2 sm:px-3"
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
-              ) : (
-                <Send className="h-4 w-4 sm:mr-2" />
-              )}
-              <span className="hidden sm:inline">Submit</span>
-            </Button>
+            {problem && (
+              <DifficultyVoting
+                problemId={id!}
+                currentDifficulty={problem.difficulty}
+              />
+            )}
           </div>
         </header>
 
         {/* Mobile View Toggle */}
-        <MobileViewToggle activeView={mobileView} onViewChange={setMobileView} hasOutput={!!output} />
+        <MobileViewToggle
+          activeView={mobileView}
+          onViewChange={setMobileView}
+          hasOutput={!!output}
+        />
 
         {/* Main Content */}
-        <div 
+        <div
           className="flex-1 flex flex-col md:flex-row overflow-hidden"
           {...swipeHandlers}
         >
-          {/* Problem Description - Desktop always visible, Mobile conditional */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`${
-              isDescriptionExpanded ? "md:w-1/2" : "md:w-12"
-            } border-r border-border bg-card overflow-hidden transition-all duration-300 flex-col ${
-              mobileView === "description" ? "flex" : "hidden md:flex"
-            } ${mobileView === "description" ? "flex-1" : ""}`}
+          {/* Problem Description */}
+          <div
+            className={`md:w-1/2 border-r border-border bg-card overflow-hidden flex-col ${
+              mobileView === "description" ? "flex flex-1" : "hidden md:flex"
+            }`}
           >
-            <button
-              onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-              className="hidden md:flex items-center justify-center h-10 border-b border-border hover:bg-secondary transition-colors"
-            >
-              {isDescriptionExpanded ? (
-                <ChevronDown className="h-4 w-4 rotate-90" />
-              ) : (
-                <ChevronUp className="h-4 w-4 rotate-90" />
-              )}
-            </button>
+            <div className="flex-1 overflow-y-auto pb-20 md:pb-0">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent p-0 h-auto">
+                  <TabsTrigger
+                    value="description"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 text-sm"
+                  >
+                    Description
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="submissions"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 text-sm"
+                  >
+                    Submissions ({submissions.length})
+                  </TabsTrigger>
+                </TabsList>
 
-            {isDescriptionExpanded && (
-              <div className="flex-1 overflow-y-auto pb-24 md:pb-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
-                  <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent p-0 h-auto">
-                    <TabsTrigger
-                      value="description"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 text-sm"
-                    >
-                      Description
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="submissions"
-                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3 text-sm"
-                    >
-                      Submissions ({submissions.length})
-                    </TabsTrigger>
-                  </TabsList>
+                <TabsContent value="description" className="p-4 sm:p-6 m-0">
+                  <div className="space-y-6">
+                    <p className="text-foreground whitespace-pre-line text-sm sm:text-base">
+                      {problem.statement}
+                    </p>
 
-                  <TabsContent value="description" className="p-4 sm:p-6 m-0">
-                    <div className="prose prose-invert max-w-none">
-                      <div className="mb-6">
-                        <p className="text-foreground whitespace-pre-line text-sm sm:text-base">
-                          {problem.statement}
-                        </p>
-                      </div>
-
-                      {problem.input_format && (
-                        <div className="mb-6">
-                          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
-                            Input Format
-                          </h3>
-                          <p className="text-muted-foreground text-xs sm:text-sm whitespace-pre-line">
-                            {problem.input_format}
-                          </p>
-                        </div>
-                      )}
-
-                      {problem.output_format && (
-                        <div className="mb-6">
-                          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
-                            Output Format
-                          </h3>
-                          <p className="text-muted-foreground text-xs sm:text-sm">
-                            {problem.output_format}
-                          </p>
-                        </div>
-                      )}
-
-                      {problem.constraints && (
-                        <div className="mb-6">
-                          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
-                            Constraints
-                          </h3>
-                          <pre className="text-xs sm:text-sm text-muted-foreground bg-secondary p-3 sm:p-4 rounded-lg whitespace-pre-line overflow-x-auto">
-                            {problem.constraints}
-                          </pre>
-                        </div>
-                      )}
-
+                    {problem.input_format && (
                       <div>
-                        <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">
-                          Examples
+                        <h3 className="text-base font-semibold text-foreground mb-2">
+                          Input Format
                         </h3>
-                        {problem.samples.map((sample, index) => (
-                          <div
-                            key={index}
-                            className="mb-4 rounded-lg border border-border overflow-hidden"
-                          >
-                            <div className="bg-secondary/50 px-3 sm:px-4 py-2 border-b border-border">
-                              <span className="text-xs sm:text-sm font-medium text-foreground">
-                                Example {index + 1}
-                              </span>
-                            </div>
-                            <div className="p-3 sm:p-4 space-y-3">
-                              <div>
-                                <span className="text-xs text-muted-foreground uppercase tracking-wide">
-                                  Input
-                                </span>
-                                <pre className="mt-1 p-2 sm:p-3 bg-secondary rounded text-xs sm:text-sm font-mono text-foreground overflow-x-auto">
-                                  {sample.input}
-                                </pre>
-                              </div>
-                              <div>
-                                <span className="text-xs text-muted-foreground uppercase tracking-wide">
-                                  Output
-                                </span>
-                                <pre className="mt-1 p-2 sm:p-3 bg-secondary rounded text-xs sm:text-sm font-mono text-foreground overflow-x-auto">
-                                  {sample.output}
-                                </pre>
-                              </div>
-                              {sample.explanation && (
-                                <div>
-                                  <span className="text-xs text-muted-foreground uppercase tracking-wide">
-                                    Explanation
-                                  </span>
-                                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-                                    {sample.explanation}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-6 flex items-center gap-2 flex-wrap">
-                        <span className="text-xs sm:text-sm text-muted-foreground">Tags:</span>
-                        {problem.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="submissions" className="p-4 sm:p-6 m-0">
-                    {submissions.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">
-                          No submissions yet
+                        <p className="text-muted-foreground text-sm whitespace-pre-line">
+                          {problem.input_format}
                         </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {submissions.map((sub) => (
-                          <div
-                            key={sub.id}
-                            className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
-                          >
-                            <div className="flex items-center gap-3">
-                              {sub.status === "Accepted" ? (
-                                <CheckCircle2 className="h-5 w-5 text-accent" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-destructive" />
-                              )}
-                              <span
-                                className={`font-medium text-sm ${
-                                  sub.status === "Accepted"
-                                    ? "text-accent"
-                                    : "text-destructive"
-                                }`}
-                              >
-                                {sub.status}
-                              </span>
-                            </div>
-                            <span className="text-xs sm:text-sm text-muted-foreground">
-                              {new Date(sub.created_at).toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
                       </div>
                     )}
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
-          </motion.div>
 
-          {/* Code Editor - Desktop always visible, Mobile conditional */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className={`flex flex-col ${
-              isFullscreen 
-                ? "fixed inset-0 z-50 bg-background" 
-                : "md:flex-1 md:min-h-0"
-            } ${mobileView === "editor" ? "flex flex-1 h-full overflow-hidden" : "hidden md:flex"}`}
+                    {problem.output_format && (
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground mb-2">
+                          Output Format
+                        </h3>
+                        <p className="text-muted-foreground text-sm">
+                          {problem.output_format}
+                        </p>
+                      </div>
+                    )}
+
+                    {problem.constraints && (
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground mb-2">
+                          Constraints
+                        </h3>
+                        <pre className="text-sm text-muted-foreground bg-secondary p-3 rounded-lg whitespace-pre-line">
+                          {problem.constraints}
+                        </pre>
+                      </div>
+                    )}
+
+                    <div>
+                      <h3 className="text-base font-semibold text-foreground mb-3">
+                        Examples
+                      </h3>
+                      {problem.samples.map((sample, index) => (
+                        <div
+                          key={index}
+                          className="mb-4 rounded-lg border border-border overflow-hidden"
+                        >
+                          <div className="bg-secondary/50 px-4 py-2 border-b border-border">
+                            <span className="text-sm font-medium">
+                              Example {index + 1}
+                            </span>
+                          </div>
+                          <div className="p-4 space-y-3">
+                            <div>
+                              <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                                Input
+                              </span>
+                              <pre className="mt-1 p-3 bg-secondary rounded text-sm font-mono">
+                                {sample.input}
+                              </pre>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                                Output
+                              </span>
+                              <pre className="mt-1 p-3 bg-secondary rounded text-sm font-mono">
+                                {sample.output}
+                              </pre>
+                            </div>
+                            {sample.explanation && (
+                              <div>
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                                  Explanation
+                                </span>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {sample.explanation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm text-muted-foreground">Tags:</span>
+                      {problem.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="submissions" className="p-4 sm:p-6 m-0">
+                  {submissions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No submissions yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {submissions.map((sub) => (
+                        <div
+                          key={sub.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            {sub.status === "Accepted" ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-400" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-400" />
+                            )}
+                            <span
+                              className={`font-medium text-sm ${
+                                sub.status === "Accepted"
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {sub.status}
+                            </span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(sub.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
+
+          {/* Code Editor Panel */}
+          <div
+            className={`flex flex-col md:flex-1 bg-secondary ${
+              mobileView === "editor" ? "flex flex-1" : "hidden md:flex"
+            }`}
           >
-            <EditorToolbar
-              code={code}
-              problemId={id}
-              editorTheme={editorSettings.editor_theme}
-              isFullscreen={isFullscreen}
-              isRunning={isRunning}
-              isSubmitting={isSubmitting}
-              lastSaved={lastSaved}
-              onRun={handleRun}
-              onSubmit={handleSubmit}
-              onFormat={formatPythonCode}
-              onReset={handleResetCode}
-              onToggleTheme={() => updateEditorSettings({ editor_theme: editorSettings.editor_theme === "vs-dark" ? "light" : "vs-dark" })}
-              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-              onLoadCode={handleLoadCode}
-              onSettingsChange={handleSettingsChange}
-            />
+            {/* Editor Header */}
+            <div className="h-12 flex items-center justify-between px-4 bg-muted border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                </div>
+                <div className="h-4 w-px bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-medium text-foreground">
+                    solution.py
+                  </span>
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    Python 3.11
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                {lastSaved && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                    <Save className="h-3.5 w-3.5" />
+                    <span>
+                      {lastSaved.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                )}
+                <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground">
+                  <kbd className="px-1.5 py-0.5 rounded bg-secondary border border-border font-mono">
+                    ⌘↵
+                  </kbd>
+                  <span>Run</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-secondary border border-border font-mono ml-2">
+                    ⌘⇧↵
+                  </kbd>
+                  <span>Submit</span>
+                </div>
+              </div>
+            </div>
 
-            <div className="flex-1 min-h-0 pb-24 md:pb-0 relative overflow-hidden">
+            {/* Monaco Editor Container */}
+            <div className="flex-1 min-h-0 relative bg-[hsl(var(--editor-bg))]">
               <Editor
                 height="100%"
                 defaultLanguage="python"
-                theme={editorSettings.editor_theme}
+                theme="vs-dark"
                 value={code}
                 onMount={handleEditorMount}
-                onChange={(value) => {
-                  const newCode = value || "";
-                  setCode(newCode);
-                  if (validationError) setValidationError(null);
-                  checkPythonErrors(newCode);
-                }}
+                onChange={(value) => setCode(value || "")}
                 options={{
                   fontSize: editorSettings.font_size,
                   fontFamily: "JetBrains Mono, monospace",
                   minimap: { enabled: false },
-                  padding: { top: 24 },
+                  padding: { top: 16, bottom: 16 },
                   lineNumbers: editorSettings.show_line_numbers ? "on" : "off",
                   scrollBeyondLastLine: false,
                   wordWrap: editorSettings.word_wrap ? "on" : "off",
                   automaticLayout: true,
-                  glyphMargin: true,
+                  cursorBlinking: "smooth",
+                  cursorSmoothCaretAnimation: "on",
+                  smoothScrolling: true,
+                  renderLineHighlight: "all",
+                  lineHeight: 1.6,
+                  folding: true,
+                  bracketPairColorization: { enabled: true },
                 }}
               />
             </div>
 
-            {/* Validation Error */}
-            {validationError && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="border-t border-destructive/30 bg-destructive/10 px-4 py-3"
-              >
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                  <span className="text-sm text-destructive">{validationError}</span>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Execution Steps */}
+            {/* Execution Progress */}
             {(isRunning || isSubmitting) && executionSteps.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="border-t border-border bg-card px-4 py-3"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="border-t border-border bg-muted px-4 py-3"
               >
-                <div className="space-y-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm font-medium text-foreground">
+                    {isSubmitting ? "Submitting..." : "Running..."}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
                   {executionSteps.map((step, index) => (
                     <div key={index} className="flex items-center gap-2">
                       {step.status === "pending" && (
-                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                        <div className="h-3 w-3 rounded-full border border-muted-foreground/30" />
                       )}
                       {step.status === "running" && (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
                       )}
                       {step.status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-accent" />
+                        <CheckCircle2 className="h-3 w-3 text-success" />
                       )}
                       {step.status === "error" && (
-                        <XCircle className="h-4 w-4 text-destructive" />
+                        <XCircle className="h-3 w-3 text-destructive" />
                       )}
-                      <span className={`text-xs sm:text-sm ${
-                        step.status === "pending" ? "text-muted-foreground" :
-                        step.status === "running" ? "text-foreground" :
-                        step.status === "done" ? "text-accent" :
-                        "text-destructive"
-                      }`}>
+                      <span
+                        className={`text-xs ${
+                          step.status === "pending"
+                            ? "text-muted-foreground"
+                            : step.status === "running"
+                            ? "text-foreground"
+                            : step.status === "done"
+                            ? "text-success"
+                            : "text-destructive"
+                        }`}
+                      >
                         {step.step}
                       </span>
                     </div>
@@ -915,74 +752,106 @@ const ProblemDetail = () => {
               </motion.div>
             )}
 
-            {/* Output Panel - Desktop only */}
-            {output && (
+            {/* Output Panel */}
+            {output && !isRunning && !isSubmitting && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`hidden md:block border-t ${
-                  verdict === "success" ? "border-accent/30 bg-accent/10" :
-                  verdict === "error" ? "border-destructive/30 bg-destructive/10" :
-                  "border-border bg-card"
-                } px-4 py-3`}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className={`border-t overflow-hidden ${
+                  verdict === "success"
+                    ? "border-success/30 bg-success/5"
+                    : verdict === "error"
+                    ? "border-destructive/30 bg-destructive/5"
+                    : "border-border bg-muted"
+                }`}
               >
-                <div className="flex items-start gap-2">
-                  {verdict === "success" && (
-                    <CheckCircle2 className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                  )}
-                  {verdict === "error" && (
-                    <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                  )}
-                  {verdict === "info" && (
-                    <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  )}
-                  <pre className={`text-xs sm:text-sm font-mono whitespace-pre-wrap ${
-                    verdict === "success" ? "text-accent" :
-                    verdict === "error" ? "text-destructive" :
-                    "text-foreground"
-                  }`}>
+                <div className="px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    {verdict === "success" && (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <span className="text-sm font-medium text-success">
+                          Accepted
+                        </span>
+                      </>
+                    )}
+                    {verdict === "error" && (
+                      <>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-sm font-medium text-destructive">
+                          Failed
+                        </span>
+                      </>
+                    )}
+                    {verdict === "info" && (
+                      <>
+                        <Terminal className="h-4 w-4 text-info" />
+                        <span className="text-sm font-medium text-info">
+                          Output
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <pre
+                    className={`text-sm font-mono whitespace-pre-wrap p-3 rounded-lg ${
+                      verdict === "success"
+                        ? "bg-success/10 text-success"
+                        : verdict === "error"
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-secondary text-foreground"
+                    }`}
+                  >
                     {output}
                   </pre>
                 </div>
               </motion.div>
             )}
-          </motion.div>
+          </div>
 
           {/* Mobile Output View */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className={`flex-1 flex-col bg-card overflow-auto ${
+          <div
+            className={`flex-1 flex-col bg-muted overflow-auto ${
               mobileView === "output" ? "flex md:hidden" : "hidden"
             }`}
           >
-            <div className="h-auto min-h-10 border-b border-border bg-secondary/50 flex items-center px-4 py-2">
+            <div className="h-12 border-b border-border flex items-center px-4 bg-card">
+              <Terminal className="h-4 w-4 mr-2 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground">Output</span>
             </div>
             <div className="flex-1 p-4">
-              {/* Execution Steps on Mobile */}
               {(isRunning || isSubmitting) && executionSteps.length > 0 && (
-                <div className="space-y-2 mb-4">
+                <div className="space-y-2 mb-4 p-4 rounded-lg bg-card border border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm font-medium text-foreground">
+                      {isSubmitting ? "Submitting..." : "Running..."}
+                    </span>
+                  </div>
                   {executionSteps.map((step, index) => (
                     <div key={index} className="flex items-center gap-2">
                       {step.status === "pending" && (
-                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                        <div className="h-3 w-3 rounded-full border border-muted-foreground/30" />
                       )}
                       {step.status === "running" && (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
                       )}
                       {step.status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-accent" />
+                        <CheckCircle2 className="h-3 w-3 text-success" />
                       )}
                       {step.status === "error" && (
-                        <XCircle className="h-4 w-4 text-destructive" />
+                        <XCircle className="h-3 w-3 text-destructive" />
                       )}
-                      <span className={`text-sm ${
-                        step.status === "pending" ? "text-muted-foreground" :
-                        step.status === "running" ? "text-foreground" :
-                        step.status === "done" ? "text-accent" :
-                        "text-destructive"
-                      }`}>
+                      <span
+                        className={`text-xs ${
+                          step.status === "pending"
+                            ? "text-muted-foreground"
+                            : step.status === "running"
+                            ? "text-foreground"
+                            : step.status === "done"
+                            ? "text-success"
+                            : "text-destructive"
+                        }`}
+                      >
                         {step.step}
                       </span>
                     </div>
@@ -990,50 +859,99 @@ const ProblemDetail = () => {
                 </div>
               )}
 
-              {/* Output Content */}
               {output ? (
-                <div className={`rounded-lg p-4 ${
-                  verdict === "success" ? "bg-accent/10 border border-accent/30" :
-                  verdict === "error" ? "bg-destructive/10 border border-destructive/30" :
-                  "bg-secondary border border-border"
-                }`}>
-                  <div className="flex items-start gap-3">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`rounded-lg overflow-hidden ${
+                    verdict === "success"
+                      ? "bg-success/10 border border-success/30"
+                      : verdict === "error"
+                      ? "bg-destructive/10 border border-destructive/30"
+                      : "bg-card border border-border"
+                  }`}
+                >
+                  <div className="px-4 py-3 border-b border-inherit flex items-center gap-2">
                     {verdict === "success" && (
-                      <CheckCircle2 className="h-6 w-6 text-accent shrink-0" />
+                      <>
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                        <span className="font-medium text-success">Accepted</span>
+                      </>
                     )}
                     {verdict === "error" && (
-                      <XCircle className="h-6 w-6 text-destructive shrink-0" />
+                      <>
+                        <XCircle className="h-5 w-5 text-destructive" />
+                        <span className="font-medium text-destructive">Failed</span>
+                      </>
                     )}
                     {verdict === "info" && (
-                      <AlertCircle className="h-6 w-6 text-primary shrink-0" />
+                      <>
+                        <AlertCircle className="h-5 w-5 text-info" />
+                        <span className="font-medium text-info">Executed</span>
+                      </>
                     )}
-                    <pre className={`text-sm font-mono whitespace-pre-wrap flex-1 ${
-                      verdict === "success" ? "text-accent" :
-                      verdict === "error" ? "text-destructive" :
-                      "text-foreground"
-                    }`}>
-                      {output}
-                    </pre>
                   </div>
-                </div>
+                  <pre
+                    className={`p-4 text-sm font-mono whitespace-pre-wrap ${
+                      verdict === "success"
+                        ? "text-success"
+                        : verdict === "error"
+                        ? "text-destructive"
+                        : "text-foreground"
+                    }`}
+                  >
+                    {output}
+                  </pre>
+                </motion.div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-                  <Terminal className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-lg font-medium">No output yet</p>
-                  <p className="text-sm mt-1">Run your code to see the output here</p>
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="p-4 rounded-full bg-secondary mb-4">
+                    <Terminal className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg font-medium text-foreground">No output yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Run your code to see the output here
+                  </p>
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         </div>
 
-        {/* Mobile Floating Action Buttons */}
-        <FloatingActionButtons
-          onRun={handleRun}
-          onSubmit={handleSubmit}
-          isRunning={isRunning}
-          isSubmitting={isSubmitting}
-        />
+        {/* Floating Action Buttons */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3"
+        >
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={handleRun}
+            disabled={isRunning || isSubmitting}
+            className="h-12 px-6 text-sm font-semibold bg-card hover:bg-secondary border-border shadow-card backdrop-blur-sm"
+          >
+            {isRunning ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            Run
+          </Button>
+          <Button
+            size="lg"
+            onClick={handleSubmit}
+            disabled={isRunning || isSubmitting}
+            className="h-12 px-6 text-sm font-semibold bg-gradient-primary hover:opacity-90 text-primary-foreground shadow-button"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Submit
+          </Button>
+        </motion.div>
       </div>
     </>
   );
