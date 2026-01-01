@@ -627,40 +627,57 @@ const ProblemDetail = () => {
             </div>
           </div>
 
-          {/* Code Editor */}
+          {/* Code Editor Panel */}
           <div
-            className={`flex flex-col md:flex-1 ${
+            className={`flex flex-col md:flex-1 bg-secondary ${
               mobileView === "editor" ? "flex flex-1" : "hidden md:flex"
             }`}
           >
-            {/* Editor Header - Matching reference design */}
-            <div className="flex items-center justify-between px-4 py-2 bg-[#1e1e1e] border-b border-[#333] text-sm">
-              <div className="flex items-center gap-4">
-                <span className="font-mono text-[#ccc] font-medium">solution.py</span>
-                <span className="text-[#888]">Python 3.11</span>
+            {/* Editor Header */}
+            <div className="h-12 flex items-center justify-between px-4 bg-muted border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                </div>
+                <div className="h-4 w-px bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-medium text-foreground">
+                    solution.py
+                  </span>
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    Python 3.11
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-4 text-[#888]">
+              <div className="flex items-center gap-4">
                 {lastSaved && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
                     <Save className="h-3.5 w-3.5" />
                     <span>
-                      Saved{" "}
                       {lastSaved.toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
-                        second: "2-digit",
                       })}
                     </span>
                   </div>
                 )}
-                <span className="hidden sm:inline">
-                  Ctrl+Enter: Run · Ctrl+Shift+Enter: Submit
-                </span>
+                <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground">
+                  <kbd className="px-1.5 py-0.5 rounded bg-secondary border border-border font-mono">
+                    ⌘↵
+                  </kbd>
+                  <span>Run</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-secondary border border-border font-mono ml-2">
+                    ⌘⇧↵
+                  </kbd>
+                  <span>Submit</span>
+                </div>
               </div>
             </div>
 
-            {/* Monaco Editor */}
-            <div className="flex-1 min-h-0 relative">
+            {/* Monaco Editor Container */}
+            <div className="flex-1 min-h-0 relative bg-[hsl(var(--editor-bg))]">
               <Editor
                 height="100%"
                 defaultLanguage="python"
@@ -672,42 +689,59 @@ const ProblemDetail = () => {
                   fontSize: editorSettings.font_size,
                   fontFamily: "JetBrains Mono, monospace",
                   minimap: { enabled: false },
-                  padding: { top: 16 },
+                  padding: { top: 16, bottom: 16 },
                   lineNumbers: editorSettings.show_line_numbers ? "on" : "off",
                   scrollBeyondLastLine: false,
                   wordWrap: editorSettings.word_wrap ? "on" : "off",
                   automaticLayout: true,
+                  cursorBlinking: "smooth",
+                  cursorSmoothCaretAnimation: "on",
+                  smoothScrolling: true,
+                  renderLineHighlight: "all",
+                  lineHeight: 1.6,
+                  folding: true,
+                  bracketPairColorization: { enabled: true },
                 }}
               />
             </div>
 
-            {/* Execution Steps */}
+            {/* Execution Progress */}
             {(isRunning || isSubmitting) && executionSteps.length > 0 && (
-              <div className="border-t border-[#333] bg-[#1e1e1e] px-4 py-3">
-                <div className="space-y-2">
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="border-t border-border bg-muted px-4 py-3"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm font-medium text-foreground">
+                    {isSubmitting ? "Submitting..." : "Running..."}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
                   {executionSteps.map((step, index) => (
                     <div key={index} className="flex items-center gap-2">
                       {step.status === "pending" && (
-                        <div className="h-4 w-4 rounded-full border-2 border-[#555]" />
+                        <div className="h-3 w-3 rounded-full border border-muted-foreground/30" />
                       )}
                       {step.status === "running" && (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
                       )}
                       {step.status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-green-400" />
+                        <CheckCircle2 className="h-3 w-3 text-success" />
                       )}
                       {step.status === "error" && (
-                        <XCircle className="h-4 w-4 text-red-400" />
+                        <XCircle className="h-3 w-3 text-destructive" />
                       )}
                       <span
-                        className={`text-sm ${
+                        className={`text-xs ${
                           step.status === "pending"
-                            ? "text-[#888]"
+                            ? "text-muted-foreground"
                             : step.status === "running"
-                            ? "text-[#ccc]"
+                            ? "text-foreground"
                             : step.status === "done"
-                            ? "text-green-400"
-                            : "text-red-400"
+                            ? "text-success"
+                            : "text-destructive"
                         }`}
                       >
                         {step.step}
@@ -715,81 +749,107 @@ const ProblemDetail = () => {
                     </div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Output Panel */}
             {output && !isRunning && !isSubmitting && (
-              <div
-                className={`border-t px-4 py-3 ${
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className={`border-t overflow-hidden ${
                   verdict === "success"
-                    ? "border-green-500/30 bg-green-500/10"
+                    ? "border-success/30 bg-success/5"
                     : verdict === "error"
-                    ? "border-red-500/30 bg-red-500/10"
-                    : "border-[#333] bg-[#1e1e1e]"
+                    ? "border-destructive/30 bg-destructive/5"
+                    : "border-border bg-muted"
                 }`}
               >
-                <div className="flex items-start gap-2">
-                  {verdict === "success" && (
-                    <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
-                  )}
-                  {verdict === "error" && (
-                    <XCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                  )}
-                  {verdict === "info" && (
-                    <AlertCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
-                  )}
+                <div className="px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    {verdict === "success" && (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <span className="text-sm font-medium text-success">
+                          Accepted
+                        </span>
+                      </>
+                    )}
+                    {verdict === "error" && (
+                      <>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-sm font-medium text-destructive">
+                          Failed
+                        </span>
+                      </>
+                    )}
+                    {verdict === "info" && (
+                      <>
+                        <Terminal className="h-4 w-4 text-info" />
+                        <span className="text-sm font-medium text-info">
+                          Output
+                        </span>
+                      </>
+                    )}
+                  </div>
                   <pre
-                    className={`text-sm font-mono whitespace-pre-wrap ${
+                    className={`text-sm font-mono whitespace-pre-wrap p-3 rounded-lg ${
                       verdict === "success"
-                        ? "text-green-400"
+                        ? "bg-success/10 text-success"
                         : verdict === "error"
-                        ? "text-red-400"
-                        : "text-[#ccc]"
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-secondary text-foreground"
                     }`}
                   >
                     {output}
                   </pre>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
 
           {/* Mobile Output View */}
           <div
-            className={`flex-1 flex-col bg-[#1e1e1e] overflow-auto ${
+            className={`flex-1 flex-col bg-muted overflow-auto ${
               mobileView === "output" ? "flex md:hidden" : "hidden"
             }`}
           >
-            <div className="h-10 border-b border-[#333] flex items-center px-4">
-              <span className="text-sm font-medium text-[#ccc]">Output</span>
+            <div className="h-12 border-b border-border flex items-center px-4 bg-card">
+              <Terminal className="h-4 w-4 mr-2 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">Output</span>
             </div>
             <div className="flex-1 p-4">
               {(isRunning || isSubmitting) && executionSteps.length > 0 && (
-                <div className="space-y-2 mb-4">
+                <div className="space-y-2 mb-4 p-4 rounded-lg bg-card border border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm font-medium text-foreground">
+                      {isSubmitting ? "Submitting..." : "Running..."}
+                    </span>
+                  </div>
                   {executionSteps.map((step, index) => (
                     <div key={index} className="flex items-center gap-2">
                       {step.status === "pending" && (
-                        <div className="h-4 w-4 rounded-full border-2 border-[#555]" />
+                        <div className="h-3 w-3 rounded-full border border-muted-foreground/30" />
                       )}
                       {step.status === "running" && (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
                       )}
                       {step.status === "done" && (
-                        <CheckCircle2 className="h-4 w-4 text-green-400" />
+                        <CheckCircle2 className="h-3 w-3 text-success" />
                       )}
                       {step.status === "error" && (
-                        <XCircle className="h-4 w-4 text-red-400" />
+                        <XCircle className="h-3 w-3 text-destructive" />
                       )}
                       <span
-                        className={`text-sm ${
+                        className={`text-xs ${
                           step.status === "pending"
-                            ? "text-[#888]"
+                            ? "text-muted-foreground"
                             : step.status === "running"
-                            ? "text-[#ccc]"
+                            ? "text-foreground"
                             : step.status === "done"
-                            ? "text-green-400"
-                            : "text-red-400"
+                            ? "text-success"
+                            : "text-destructive"
                         }`}
                       >
                         {step.step}
@@ -800,61 +860,76 @@ const ProblemDetail = () => {
               )}
 
               {output ? (
-                <div
-                  className={`rounded-lg p-4 ${
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`rounded-lg overflow-hidden ${
                     verdict === "success"
-                      ? "bg-green-500/10 border border-green-500/30"
+                      ? "bg-success/10 border border-success/30"
                       : verdict === "error"
-                      ? "bg-red-500/10 border border-red-500/30"
-                      : "bg-[#252525] border border-[#333]"
+                      ? "bg-destructive/10 border border-destructive/30"
+                      : "bg-card border border-border"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="px-4 py-3 border-b border-inherit flex items-center gap-2">
                     {verdict === "success" && (
-                      <CheckCircle2 className="h-6 w-6 text-green-400 shrink-0" />
+                      <>
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                        <span className="font-medium text-success">Accepted</span>
+                      </>
                     )}
                     {verdict === "error" && (
-                      <XCircle className="h-6 w-6 text-red-400 shrink-0" />
+                      <>
+                        <XCircle className="h-5 w-5 text-destructive" />
+                        <span className="font-medium text-destructive">Failed</span>
+                      </>
                     )}
                     {verdict === "info" && (
-                      <AlertCircle className="h-6 w-6 text-blue-400 shrink-0" />
+                      <>
+                        <AlertCircle className="h-5 w-5 text-info" />
+                        <span className="font-medium text-info">Executed</span>
+                      </>
                     )}
-                    <pre
-                      className={`text-sm font-mono whitespace-pre-wrap flex-1 ${
-                        verdict === "success"
-                          ? "text-green-400"
-                          : verdict === "error"
-                          ? "text-red-400"
-                          : "text-[#ccc]"
-                      }`}
-                    >
-                      {output}
-                    </pre>
                   </div>
-                </div>
+                  <pre
+                    className={`p-4 text-sm font-mono whitespace-pre-wrap ${
+                      verdict === "success"
+                        ? "text-success"
+                        : verdict === "error"
+                        ? "text-destructive"
+                        : "text-foreground"
+                    }`}
+                  >
+                    {output}
+                  </pre>
+                </motion.div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-[#888]">
-                  <Terminal className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-lg font-medium">No output yet</p>
-                  <p className="text-sm mt-1">Run your code to see the output</p>
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="p-4 rounded-full bg-secondary mb-4">
+                    <Terminal className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg font-medium text-foreground">No output yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Run your code to see the output here
+                  </p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Floating Run/Submit Buttons */}
+        {/* Floating Action Buttons */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-6 right-6 z-40 flex gap-3"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3"
         >
           <Button
             variant="outline"
             size="lg"
             onClick={handleRun}
             disabled={isRunning || isSubmitting}
-            className="h-12 px-5 text-sm font-semibold bg-[#1e1e1e] hover:bg-[#2a2a2a] border-[#444] text-[#ccc] shadow-lg"
+            className="h-12 px-6 text-sm font-semibold bg-card hover:bg-secondary border-border shadow-card backdrop-blur-sm"
           >
             {isRunning ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -867,7 +942,7 @@ const ProblemDetail = () => {
             size="lg"
             onClick={handleSubmit}
             disabled={isRunning || isSubmitting}
-            className="h-12 px-5 text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
+            className="h-12 px-6 text-sm font-semibold bg-gradient-primary hover:opacity-90 text-primary-foreground shadow-button"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
